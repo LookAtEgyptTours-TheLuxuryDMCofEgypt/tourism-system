@@ -438,6 +438,9 @@
             <div class="form-group"><label>اسم الأوبريتور</label><input type="text" id="guideName" placeholder="اسم الأوبريتور"></div>
           </div>
           <div class="form-row">
+            <div class="form-group"><label>اسم الملف</label><input type="text" id="settlementFileName" placeholder="اسم الملف..."></div>
+          </div>
+          <div class="form-row">
             <div class="form-group"><label>عدد الأفراد</label><input type="number" id="settlementPaxCount" placeholder="عدد الأفراد..." min="0" step="1"></div>
             <div class="form-group">
               <label>نوع الملف</label>
@@ -508,6 +511,7 @@
                     <th>كود الملف</th>
                     <th>الشهر</th>
                     <th>اسم الأوبريتور</th>
+                    <th>اسم الملف</th>
                     <th>عدد الأفراد</th>
                     <th>نوع الملف</th>
                     <th>الإيرادات</th>
@@ -522,7 +526,7 @@
                   </tr>
                 </thead>
                 <tbody id="settlementsTableBody">
-                  <tr><td colspan="15" style="text-align:center;">جاري التحميل...</td></tr>
+                  <tr><td colspan="16" style="text-align:center;">جاري التحميل...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -568,6 +572,7 @@
                     <th>كود الملف</th>
                     <th>الشهر</th>
                     <th>اسم الأوبريتور</th>
+                    <th>اسم الملف</th>
                     <th>عدد الأفراد</th>
                     <th>نوع الملف</th>
                     <th>الإيرادات</th>
@@ -583,7 +588,7 @@
                   </tr>
                 </thead>
                 <tbody id="settlementsArchiveTableBody">
-                  <tr><td colspan="16" style="text-align:center;">لا توجد تصفيات معتمدة في الأرشيف</td></tr>
+                  <tr><td colspan="17" style="text-align:center;">لا توجد تصفيات معتمدة في الأرشيف</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1151,6 +1156,7 @@
     <input type="hidden" id="editSettlementId">
     <div class="form-group"><label>كود الملف</label><input type="text" id="editFileCode" placeholder="202603/145" oninput="App.previewSettlementMonth('editFileCode','editFileCodeMonthHint')"><small id="editFileCodeMonthHint" style="display:block; margin-top:4px; color:#64748b;"></small></div>
     <div class="form-group"><label>اسم الأوبريتور</label><input type="text" id="editGuideName"></div>
+    <div class="form-group"><label>اسم الملف</label><input type="text" id="editSettlementFileName"></div>
     <div class="form-group"><label>عدد الأفراد</label><input type="number" id="editSettlementPaxCount" min="0" step="1"></div>
     <div class="form-group">
       <label>نوع الملف</label>
