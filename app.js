@@ -1951,51 +1951,51 @@
       if ($('anStatPax')) $('anStatPax').innerText = totalPax.toLocaleString();
       if ($('anStatAvgCommission')) $('anStatAvgCommission').innerText = totalPax > 0 ? fmt(totalCommission / totalPax) : '-';
 
-      // ---- جدول 1: الربح حسب الشهر وعدد الملفات (+ متوسط الربح للملف) ----
+      // ---- جدول 1: الربح حسب الشهر (+ متوسط الربح للملف، محسوب من عدد الملفات داخليًا من غير ما نعرضه كعمود) ----
       if (profitRows.length === 0) {
-        profitBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">لا توجد بيانات</td></tr>';
+        profitBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد بيانات</td></tr>';
       } else {
         let html = ''; let lastOp = null; let opFileCount = 0; let opProfit = 0;
         let grandFiles = 0; let grandProfit = 0;
         const flushSubtotal = () => {
           if (lastOp === null) return;
           const avg = opFileCount > 0 ? opProfit / opFileCount : 0;
-          html += `<tr style="font-weight:700; background:#f8fafc;"><td colspan="2">إجمالي ${escapeHTML(lastOp)}</td><td>${opFileCount}</td><td>${fmt(opProfit)}</td><td>${fmt(avg)}</td></tr>`;
+          html += `<tr style="font-weight:700; background:#f8fafc;"><td colspan="2">إجمالي ${escapeHTML(lastOp)}</td><td>${fmt(opProfit)}</td><td>${fmt(avg)}</td></tr>`;
         };
         profitRows.forEach(r => {
           if (r.operator !== lastOp) { flushSubtotal(); lastOp = r.operator; opFileCount = 0; opProfit = 0; }
           const avg = r.fileCount > 0 ? r.totalProfit / r.fileCount : 0;
-          html += `<tr><td>${escapeHTML(r.operator)}</td><td>${escapeHTML(r.label)}</td><td>${r.fileCount}</td><td>${fmt(r.totalProfit)}</td><td>${fmt(avg)}</td></tr>`;
+          html += `<tr><td>${escapeHTML(r.operator)}</td><td>${escapeHTML(r.label)}</td><td>${fmt(r.totalProfit)}</td><td>${fmt(avg)}</td></tr>`;
           opFileCount += r.fileCount; opProfit += r.totalProfit;
           grandFiles += r.fileCount; grandProfit += r.totalProfit;
         });
         flushSubtotal();
         const grandAvg = grandFiles > 0 ? grandProfit / grandFiles : 0;
-        html += `<tr style="font-weight:700; background:#eef2ff;"><td colspan="2">الإجمالي العام</td><td>${grandFiles}</td><td>${fmt(grandProfit)}</td><td>${fmt(grandAvg)}</td></tr>`;
+        html += `<tr style="font-weight:700; background:#eef2ff;"><td colspan="2">الإجمالي العام</td><td>${fmt(grandProfit)}</td><td>${fmt(grandAvg)}</td></tr>`;
         profitBody.innerHTML = html;
       }
 
-      // ---- جدول 2: مبلغ العمولة حسب الشهر وعدد الأفراد (+ متوسط العمولة للفرد) ----
+      // ---- جدول 2: مبلغ العمولة حسب الشهر (+ متوسط العمولة للفرد، محسوب من عدد الأفراد داخليًا من غير ما نعرضه كعمود) ----
       if (commissionRows.length === 0) {
-        commissionBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">لا توجد بيانات</td></tr>';
+        commissionBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد بيانات</td></tr>';
       } else {
         let html = ''; let lastOp = null; let opPax = 0; let opCommission = 0;
         let grandPax = 0; let grandCommission = 0;
         const flushSubtotal = () => {
           if (lastOp === null) return;
           const avg = opPax > 0 ? opCommission / opPax : 0;
-          html += `<tr style="font-weight:700; background:#f8fafc;"><td colspan="2">إجمالي ${escapeHTML(lastOp)}</td><td>${opPax}</td><td style="color:#16a34a;">${fmt(opCommission)}</td><td>${fmt(avg)}</td></tr>`;
+          html += `<tr style="font-weight:700; background:#f8fafc;"><td colspan="2">إجمالي ${escapeHTML(lastOp)}</td><td style="color:#16a34a;">${fmt(opCommission)}</td><td>${fmt(avg)}</td></tr>`;
         };
         commissionRows.forEach(r => {
           if (r.operator !== lastOp) { flushSubtotal(); lastOp = r.operator; opPax = 0; opCommission = 0; }
           const avg = r.totalPax > 0 ? r.totalCommission / r.totalPax : 0;
-          html += `<tr><td>${escapeHTML(r.operator)}</td><td>${escapeHTML(r.label)}</td><td>${r.totalPax}</td><td style="color:#16a34a;">${fmt(r.totalCommission)}</td><td>${fmt(avg)}</td></tr>`;
+          html += `<tr><td>${escapeHTML(r.operator)}</td><td>${escapeHTML(r.label)}</td><td style="color:#16a34a;">${fmt(r.totalCommission)}</td><td>${fmt(avg)}</td></tr>`;
           opPax += r.totalPax; opCommission += r.totalCommission;
           grandPax += r.totalPax; grandCommission += r.totalCommission;
         });
         flushSubtotal();
         const grandAvg = grandPax > 0 ? grandCommission / grandPax : 0;
-        html += `<tr style="font-weight:700; background:#eef2ff;"><td colspan="2">الإجمالي العام</td><td>${grandPax}</td><td style="color:#16a34a;">${fmt(grandCommission)}</td><td>${fmt(grandAvg)}</td></tr>`;
+        html += `<tr style="font-weight:700; background:#eef2ff;"><td colspan="2">الإجمالي العام</td><td style="color:#16a34a;">${fmt(grandCommission)}</td><td>${fmt(grandAvg)}</td></tr>`;
         commissionBody.innerHTML = html;
       }
 
@@ -2016,26 +2016,26 @@
       const fmt2 = (n) => Math.round((n || 0) * 100) / 100;
 
       const buildSheetRows = (rows, valueKeys) => {
-        // valueKeys: { countKey, countLabel, amountKey, amountLabel, avgLabel }
+        // valueKeys: { countKey, amountKey, amountLabel, avgLabel } — العدد (ملفات/أفراد) بيتحسب بيه المتوسط فقط من غير ما يتعرض كعمود
         const out = [];
         let lastOp = null, opCount = 0, opAmount = 0, grandCount = 0, grandAmount = 0;
         const flushSubtotal = () => {
           if (lastOp === null) return;
-          out.push({ "الأوبريتور": 'إجمالي ' + lastOp, "الشهر": '', [valueKeys.countLabel]: opCount, [valueKeys.amountLabel]: fmt2(opAmount), [valueKeys.avgLabel]: opCount > 0 ? fmt2(opAmount / opCount) : 0 });
+          out.push({ "الأوبريتور": 'إجمالي ' + lastOp, "الشهر": '', [valueKeys.amountLabel]: fmt2(opAmount), [valueKeys.avgLabel]: opCount > 0 ? fmt2(opAmount / opCount) : 0 });
         };
         rows.forEach(r => {
           if (r.operator !== lastOp) { flushSubtotal(); lastOp = r.operator; opCount = 0; opAmount = 0; }
           const count = r[valueKeys.countKey], amount = r[valueKeys.amountKey];
-          out.push({ "الأوبريتور": r.operator, "الشهر": r.label, [valueKeys.countLabel]: count, [valueKeys.amountLabel]: fmt2(amount), [valueKeys.avgLabel]: count > 0 ? fmt2(amount / count) : 0 });
+          out.push({ "الأوبريتور": r.operator, "الشهر": r.label, [valueKeys.amountLabel]: fmt2(amount), [valueKeys.avgLabel]: count > 0 ? fmt2(amount / count) : 0 });
           opCount += count; opAmount += amount; grandCount += count; grandAmount += amount;
         });
         flushSubtotal();
-        out.push({ "الأوبريتور": 'الإجمالي العام', "الشهر": '', [valueKeys.countLabel]: grandCount, [valueKeys.amountLabel]: fmt2(grandAmount), [valueKeys.avgLabel]: grandCount > 0 ? fmt2(grandAmount / grandCount) : 0 });
+        out.push({ "الأوبريتور": 'الإجمالي العام', "الشهر": '', [valueKeys.amountLabel]: fmt2(grandAmount), [valueKeys.avgLabel]: grandCount > 0 ? fmt2(grandAmount / grandCount) : 0 });
         return out;
       };
 
-      const profitSheetData = buildSheetRows(profitRows, { countKey: 'fileCount', countLabel: 'عدد الملفات', amountKey: 'totalProfit', amountLabel: 'إجمالي الربح', avgLabel: 'متوسط الربح للملف' });
-      const commissionSheetData = buildSheetRows(commissionRows, { countKey: 'totalPax', countLabel: 'عدد الأفراد', amountKey: 'totalCommission', amountLabel: 'مبلغ العمولة', avgLabel: 'متوسط العمولة للفرد' });
+      const profitSheetData = buildSheetRows(profitRows, { countKey: 'fileCount', amountKey: 'totalProfit', amountLabel: 'إجمالي الربح', avgLabel: 'متوسط الربح للملف' });
+      const commissionSheetData = buildSheetRows(commissionRows, { countKey: 'totalPax', amountKey: 'totalCommission', amountLabel: 'مبلغ العمولة', avgLabel: 'متوسط العمولة للفرد' });
 
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(profitSheetData), "تحليل الربح");
@@ -2064,22 +2064,16 @@
       // الأوبريتورز الظاهرين فعليًا في البيانات المفلترة حاليًا (مرتبين بنفس ترتيب الألوان)
       const operatorsInView = opOrder.filter(op => profitRows.some(r => r.operator === op) || commissionRows.some(r => r.operator === op));
 
-      // إجمالي كل شهر (لرسم الخط الكلي فوق أعمدة الأوبريتورز)
-      const totalFilesByMonth = {}, totalPaxByMonth = {};
-      profitRows.forEach(r => { totalFilesByMonth[r.sortKey] = (totalFilesByMonth[r.sortKey] || 0) + r.fileCount; });
-      commissionRows.forEach(r => { totalPaxByMonth[r.sortKey] = (totalPaxByMonth[r.sortKey] || 0) + r.totalPax; });
-
-      // 1) الربح حسب الشهر — عمود لكل أوبريتور (اسمه ظاهر في الأسطورة) + خط إجمالي عدد الملفات
+      // 1) الربح حسب الشهر — عمود لكل أوبريتور (اسمه ظاهر في الأسطورة)
       const profitCanvas = $('analysisProfitChart');
       if (profitCanvas) {
         destroy('profit');
         const profitByOpMonth = {}; // operator -> sortKey -> total
         profitRows.forEach(r => { (profitByOpMonth[r.operator] = profitByOpMonth[r.operator] || {})[r.sortKey] = r.totalProfit; });
         const datasets = operatorsInView.map(op => ({
-          type: 'bar', label: op, backgroundColor: colorOf(op), yAxisID: 'y',
+          label: op, backgroundColor: colorOf(op),
           data: sortKeys.map(k => (profitByOpMonth[op] && profitByOpMonth[op][k]) || 0)
         }));
-        datasets.push({ type: 'line', label: 'إجمالي عدد الملفات', data: sortKeys.map(k => totalFilesByMonth[k] || 0), borderColor: '#1e293b', backgroundColor: '#1e293b', yAxisID: 'y1', tension: 0.3 });
         this._analysisCharts.profit = new Chart(profitCanvas, {
           type: 'bar',
           data: { labels, datasets },
@@ -2088,8 +2082,7 @@
             plugins: { legend: { position: 'bottom' } },
             scales: {
               x: { stacked: false },
-              y: { position: 'left', title: { display: true, text: 'الربح' } },
-              y1: { position: 'right', title: { display: true, text: 'عدد الملفات' }, grid: { drawOnChartArea: false } }
+              y: { title: { display: true, text: 'الربح' } }
             }
           }
         });
@@ -2116,17 +2109,16 @@
         });
       }
 
-      // 3) مبلغ العمولة حسب الشهر — عمود لكل أوبريتور + خط إجمالي عدد الأفراد
+      // 3) مبلغ العمولة حسب الشهر — عمود لكل أوبريتور
       const commissionCanvas = $('analysisCommissionChart');
       if (commissionCanvas) {
         destroy('commission');
         const commissionByOpMonth = {};
         commissionRows.forEach(r => { (commissionByOpMonth[r.operator] = commissionByOpMonth[r.operator] || {})[r.sortKey] = r.totalCommission; });
         const datasets = operatorsInView.map(op => ({
-          type: 'bar', label: op, backgroundColor: colorOf(op), yAxisID: 'y',
+          label: op, backgroundColor: colorOf(op),
           data: sortKeys.map(k => (commissionByOpMonth[op] && commissionByOpMonth[op][k]) || 0)
         }));
-        datasets.push({ type: 'line', label: 'إجمالي عدد الأفراد', data: sortKeys.map(k => totalPaxByMonth[k] || 0), borderColor: '#1e293b', backgroundColor: '#1e293b', yAxisID: 'y1', tension: 0.3 });
         this._analysisCharts.commission = new Chart(commissionCanvas, {
           type: 'bar',
           data: { labels, datasets },
@@ -2134,8 +2126,7 @@
             responsive: true, maintainAspectRatio: false,
             plugins: { legend: { position: 'bottom' } },
             scales: {
-              y: { position: 'left', title: { display: true, text: 'العمولة' } },
-              y1: { position: 'right', title: { display: true, text: 'عدد الأفراد' }, grid: { drawOnChartArea: false } }
+              y: { title: { display: true, text: 'العمولة' } }
             }
           }
         });
