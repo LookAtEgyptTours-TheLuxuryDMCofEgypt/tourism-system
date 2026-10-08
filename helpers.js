@@ -412,23 +412,70 @@
   }
 
   function filterTicketsTable() {
-    const guideInput = document.getElementById("searchTicketsGuide");
-    const fileCodeInput = document.getElementById("searchTicketsFileCode");
-    const guideFilter = guideInput ? guideInput.value.toLowerCase() : "";
-    const fileCodeFilter = fileCodeInput ? fileCodeInput.value.toLowerCase() : "";
+    const guideFilter = (document.getElementById("ticketSearchGuide")?.value || "").toLowerCase().trim();
+    const fileCodeFilter = (document.getElementById("ticketSearchFileCode")?.value || "").toLowerCase().trim();
+    const landmarkFilter = (document.getElementById("ticketSearchLandmark")?.value || "").toLowerCase().trim();
 
     const trs = document.querySelectorAll("#ticketsTable tbody tr");
     trs.forEach(tr => {
       if (tr.children.length === 1) return;
       // ترتيب الأعمدة: #(0) الحركة(1) رقم الملف(2) اسم المزار(3) المندوب/المرشد(4) ...
       const fileCodeText = (tr.children[2] ? tr.children[2].innerText : "").toLowerCase();
+      const landmarkText = (tr.children[3] ? tr.children[3].innerText : "").toLowerCase();
       const guideText = (tr.children[4] ? tr.children[4].innerText : "").toLowerCase();
 
       const matchesGuide = !guideFilter || guideText.includes(guideFilter);
       const matchesFileCode = !fileCodeFilter || fileCodeText.includes(fileCodeFilter);
+      const matchesLandmark = !landmarkFilter || landmarkText.includes(landmarkFilter);
 
-      tr.style.display = (matchesGuide && matchesFileCode) ? "" : "none";
+      tr.style.display = (matchesGuide && matchesFileCode && matchesLandmark) ? "" : "none";
     });
+  }
+
+  // ===== بحث سجل مخزون التذاكر (نافذة البحث: المرشد/المندوب + رقم الملف + اسم المزار) =====
+  function openTicketsSearchModal() {
+    // اقتراحات أسماء المزارات من حركات التذاكر المسجلة
+    const landmarks = [...new Set(((window.App && window.App.currentTickets) || [])
+      .filter(t => t.ticketName).map(t => t.ticketName.trim()))]
+      .sort((a, b) => a.localeCompare(b, 'ar'));
+    const dl = document.getElementById('ticketSearchLandmarkList');
+    if (dl) dl.innerHTML = landmarks.map(n => `<option value="${escapeHTML(n)}"></option>`).join('');
+
+    document.getElementById('ticketsSearchModal').style.display = 'flex';
+    setTimeout(() => { const inp = document.getElementById('ticketSearchGuide'); if (inp) inp.focus(); }, 50);
+  }
+
+  function closeTicketsSearchModal() {
+    document.getElementById('ticketsSearchModal').style.display = 'none';
+  }
+
+  function applyTicketsSearch() {
+    filterTicketsTable();
+    closeTicketsSearchModal();
+    updateTicketsFilterChip();
+  }
+
+  function updateTicketsFilterChip() {
+    const chip = document.getElementById('ticketsActiveFilter');
+    if (!chip) return;
+    const guide = (document.getElementById('ticketSearchGuide')?.value || '').trim();
+    const fileCode = (document.getElementById('ticketSearchFileCode')?.value || '').trim();
+    const landmark = (document.getElementById('ticketSearchLandmark')?.value || '').trim();
+    if (!guide && !fileCode && !landmark) { chip.innerHTML = ''; chip.style.display = 'none'; return; }
+    const parts = [];
+    if (guide) parts.push('المرشد: ' + escapeHTML(guide));
+    if (fileCode) parts.push('الملف: ' + escapeHTML(fileCode));
+    if (landmark) parts.push('المزار: ' + escapeHTML(landmark));
+    chip.innerHTML = `<span>${parts.join(' • ')}</span><button type="button" title="مسح البحث" onclick="resetTicketsSearch()">✖</button>`;
+    chip.style.display = 'inline-flex';
+  }
+
+  function resetTicketsSearch() {
+    const g = document.getElementById('ticketSearchGuide'); if (g) g.value = '';
+    const f = document.getElementById('ticketSearchFileCode'); if (f) f.value = '';
+    const l = document.getElementById('ticketSearchLandmark'); if (l) l.value = '';
+    filterTicketsTable();
+    updateTicketsFilterChip();
   }
 
   function filterTicketsBalanceTable() {
@@ -572,6 +619,8 @@
       if (m && m.style.display === 'flex') closeSettlementSearchModal();
       const sm = document.getElementById('statementSearchModal');
       if (sm && sm.style.display === 'flex') closeStatementSearchModal();
+      const tm = document.getElementById('ticketsSearchModal');
+      if (tm && tm.style.display === 'flex') closeTicketsSearchModal();
     }
   });
 
