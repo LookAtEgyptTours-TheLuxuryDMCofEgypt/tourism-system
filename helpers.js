@@ -624,7 +624,17 @@
     }
   });
 
-  function printArchiveSettlementsList() { window.print(); }
+  // طباعة بوضع أفقي (landscape) للصفحات العريضة، وبيرجّع الإعداد الافتراضي بعد الطباعة
+  function printWithOrientation(orientation) {
+    const style = document.createElement('style');
+    style.textContent = '@page { size: A4 ' + orientation + '; margin: 8mm; }';
+    document.head.appendChild(style);
+    const cleanup = () => { style.remove(); window.removeEventListener('afterprint', cleanup); };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+  }
+  function printArchiveSettlementsList() { printWithOrientation('landscape'); }
+  function printSettlementAnalysis() { printWithOrientation('portrait'); }
   function downloadArchiveSettlementsPDF() {
     const element = document.getElementById('printableSettlementArchiveArea');
     const opt = {
@@ -673,7 +683,7 @@
       html2canvas: { ignoreElements: (el) => el.classList && el.classList.contains('no-print') }
     }).from(element).save();
   }
-  function printSettlementsList() { window.print(); }
+  function printSettlementsList() { printWithOrientation('landscape'); }
   function downloadSettlementAnalysisPDF() {
     const element = document.getElementById('printableSettlementAnalysis');
     html2pdf().set({ margin: 0.5, filename: 'Settlement_Analysis.pdf', jsPDF: { unit: 'in', format: 'a4', orientation: 'landscape' }, html2canvas: { ignoreElements: (el) => el.classList && el.classList.contains('no-print') } }).from(element).save();
