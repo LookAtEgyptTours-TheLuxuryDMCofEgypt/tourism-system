@@ -1380,49 +1380,12 @@
 
   <div class="tourism-layout">
     <div class="tourism-subtabs">
-      <button class="sub-tab-btn active" onclick="openTourismSubTab(event, 'tourismTicketsBalanceSubTab')" data-i18n="tourism_sub_tickets_balance">🎟️ أرصدة التذاكر</button>
-      <button class="sub-tab-btn" onclick="openTourismSubTab(event, 'tourismCreditSummarySubTab')" data-i18n="tourism_sub_credit_summary">💳 أرصدة الكريديت</button>
+      <button class="sub-tab-btn active" onclick="openTourismSubTab(event, 'tourismCreditSummarySubTab')" data-i18n="tourism_sub_credit_summary">💳 أرصدة الكريديت</button>
     </div>
 
     <div class="tourism-content-area">
-      <!-- أرصدة التذاكر -->
-      <div id="tourismTicketsBalanceSubTab" class="tourism-subtab-content active">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
-          <h3 data-i18n="h_tickets_balance">أرصدة التذاكر (المخزون المتبقي لكل مزار)</h3>
-          <div class="btn-group no-print" style="margin:0;">
-            <button class="print-btn" onclick="window.print()">🖨️ طباعة</button>
-            <button class="pdf-btn" onclick="downloadTicketsBalancePDF()">📄 PDF</button>
-            <button class="excel-btn" onclick="App.exportTourismTicketsBalance()">📊 Excel</button>
-            <input type="text" id="searchTourismTicketsBalance" placeholder="🔍 بحث عن مزار..." onkeyup="filterTourismTicketsBalanceTable()" style="max-width:200px;">
-          </div>
-        </div>
-        <div id="printableTourismTicketsBalanceArea">
-          <div class="pdf-report-header">
-            <h2>تقرير أرصدة مخزون التذاكر</h2>
-            <p>LOOK ATEGYPT TOURS — The Luxury DMC of Egypt</p>
-          </div>
-          <div class="table-wrapper">
-            <table id="tourismTicketsBalanceTable">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>اسم المزار / الفعالية</th>
-                  <th>إجمالي الإضافة</th>
-                  <th>إجمالي الصرف</th>
-                  <th>إجمالي التذاكر منتهية الصلاحية</th>
-                  <th>الرصيد المتبقي</th>
-                </tr>
-              </thead>
-              <tbody id="tourismTicketsBalanceTableBody">
-                <tr><td colspan="6" style="text-align:center;">لا توجد بيانات</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       <!-- الملخص والداش بورد (الكريديت) -->
-      <div id="tourismCreditSummarySubTab" class="tourism-subtab-content">
+      <div id="tourismCreditSummarySubTab" class="tourism-subtab-content active">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
           <h3 data-i18n="h_credit_summary">ملخص Dashboard الكريديت</h3>
           <div class="btn-group no-print" style="margin:0;">

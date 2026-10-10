@@ -697,7 +697,6 @@
 
     // تحديث كل شاشات قسم السياحة دفعة واحدة
     refreshTourismView() {
-      this.updateTourismTicketsBalance();
       this.updateTourismCreditDashboard();
     },
 
@@ -1719,66 +1718,9 @@
         `;
       }).join('');
 
-      // تحديث نسخة قسم السياحة (إن وُجدت)
-      this.updateTourismTicketsBalance();
     },
 
-    // ===== قسم السياحة: أرصدة التذاكر =====
-    updateTourismTicketsBalance() {
-      const tbody = $('tourismTicketsBalanceTableBody');
-      if (!tbody) return;
-
-      const today = new Date(new Date().toDateString());
-      const grouped = {};
-      this.currentTickets.forEach(t => {
-        const name = (t.ticketName || '').trim() || 'بدون اسم مزار';
-        if (!grouped[name]) grouped[name] = { added: 0, deducted: 0, expired: 0 };
-        const qty = parseFloat(t.qty) || 0;
-        if (t.action === 'صرف') {
-          grouped[name].deducted += qty;
-        } else {
-          grouped[name].added += qty;
-          if (t.expiryDate) {
-            const expiryDateObj = new Date(t.expiryDate);
-            if (expiryDateObj < today) grouped[name].expired += qty;
-          }
-        }
-      });
-
-      const names = Object.keys(grouped).sort((a, b) => a.localeCompare(b, 'ar'));
-      if (names.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">لا توجد بيانات</td></tr>';
-        return;
-      }
-
-      let idx = 1;
-      tbody.innerHTML = names.map(name => {
-        const g = grouped[name];
-        const balance = g.added - g.deducted - g.expired;
-        const balanceColor = balance < 0 ? '#dc2626' : (balance === 0 ? '#64748b' : '#15803d');
-        return `
-          <tr>
-            <td>${idx++}</td>
-            <td><strong>${escapeHTML(name)}</strong></td>
-            <td>${g.added.toLocaleString()}</td>
-            <td>${g.deducted.toLocaleString()}</td>
-            <td style="color:#dc2626;">${g.expired.toLocaleString()}</td>
-            <td style="font-weight:800; color:${balanceColor};">${balance.toLocaleString()}</td>
-          </tr>
-        `;
-      }).join('');
-    },
-
-    exportTourismTicketsBalance() {
-      const table = $('tourismTicketsBalanceTable');
-      if (!table) return;
-      const rows = table.querySelectorAll('tbody tr');
-      if (rows.length === 0 || (rows.length === 1 && rows[0].children.length === 1)) return showToast('لا توجد بيانات', 'error');
-      const wb = XLSX.utils.table_to_book(table, { sheet: "أرصدة التذاكر" });
-      XLSX.writeFile(wb, "Tourism_Tickets_Balance.xlsx");
-    },
-
-    exportTicketsBalance() {
+exportTicketsBalance() {
       const table = $('ticketsBalanceTable');
       const rows = table.querySelectorAll('tbody tr');
       if (rows.length === 0 || (rows.length === 1 && rows[0].children.length === 1)) return showToast('لا توجد بيانات', 'error');

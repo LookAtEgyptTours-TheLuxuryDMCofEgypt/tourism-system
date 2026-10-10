@@ -221,16 +221,7 @@
     if (window.showToast) window.showToast(t('admin_pin_changed'), 'success'); else alert(t('admin_pin_changed'));
   }
 
-  function filterTourismTicketsBalanceTable() {
-    const input = document.getElementById('searchTourismTicketsBalance');
-    const filter = input ? input.value.toLowerCase() : '';
-    document.querySelectorAll('#tourismTicketsBalanceTable tbody tr').forEach(tr => {
-      if (tr.children.length === 1) return;
-      tr.style.display = tr.innerText.toLowerCase().includes(filter) ? '' : 'none';
-    });
-  }
-
-  function filterTourismEntitySummaryTable() {
+    function filterTourismEntitySummaryTable() {
     const input = document.getElementById('searchTourismEntitySummary');
     const filter = input ? input.value.toLowerCase() : '';
     document.querySelectorAll('#tourismEntitySummaryTable tbody tr').forEach(tr => {

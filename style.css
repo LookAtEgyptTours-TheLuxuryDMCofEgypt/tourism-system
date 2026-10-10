@@ -337,10 +337,9 @@
       #printableShopsArea, #printableShopsArea *,
       #printableSettlementArea, #printableSettlementArea *,
       #printableSettlementArchiveArea, #printableSettlementArchiveArea *,
-      #printableTourismTicketsBalanceArea, #printableTourismTicketsBalanceArea *,
       #printableSettlementAnalysis, #printableSettlementAnalysis *,
       #printableTourismArea, #printableTourismArea * { visibility: visible; }
-      #printableArea, #printableSuppliersArea, #printableStatementArea, #printableAviationArea, #printableTicketsArea, #printableTicketsBalanceArea, #printableShopsArea, #printableSettlementArea, #printableSettlementArchiveArea, #printableSettlementAnalysis, #printableTourismTicketsBalanceArea, #printableTourismArea { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; }
+      #printableArea, #printableSuppliersArea, #printableStatementArea, #printableAviationArea, #printableTicketsArea, #printableTicketsBalanceArea, #printableShopsArea, #printableSettlementArea, #printableSettlementArchiveArea, #printableSettlementAnalysis, #printableTourismArea { position: absolute; left: 0; top: 0; width: 100%; padding: 10px; }
       .no-print { display: none !important; }
       .pdf-report-header { display: block !important; }
     }
@@ -380,7 +379,7 @@
     @media print {
       #printableArea, #printableSuppliersArea, #printableStatementArea, #printableAviationArea,
       #printableTicketsArea, #printableTicketsBalanceArea, #printableShopsArea, #printableSettlementArea,
-      #printableSettlementArchiveArea, #printableTourismTicketsBalanceArea, #printableTourismArea { box-sizing: border-box; max-width: 100%; }
+      #printableSettlementArchiveArea, #printableTourismArea { box-sizing: border-box; max-width: 100%; }
       /* الغلاف كان بيقص اللي يزيد عن عرض الصفحة (overflow-x:auto) */
       #printableTicketsArea .table-wrapper, #printableTicketsBalanceArea .table-wrapper,
       #printableAviationArea .table-wrapper, #printableShopsArea .table-wrapper,
