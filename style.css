@@ -420,3 +420,17 @@
       #settlementsTable tr, #settlementsArchiveTable tr, #analysisProfitTable tr, #analysisCommissionTable tr { page-break-inside: avoid; }
       #printableSettlementAnalysis canvas { max-width: 100% !important; }
     }
+
+
+    /* ===== جدول عمليات المحلات: منع انضغاط أعمدة النص (المحل / البيان) لكلمة في كل سطر ===== */
+    @media screen {
+      #shopsTable th, #shopsTable td { padding: 10px 6px; }
+      /* الأعمدة القصيرة (رقم، نوع، فترة، مبالغ، حالة، تاريخ) في سطر واحد */
+      #shopsTable th:nth-child(1), #shopsTable td:nth-child(1),
+      #shopsTable th:nth-child(n+4):nth-child(-n+12), #shopsTable td:nth-child(n+4):nth-child(-n+12),
+      #shopsTable th:nth-child(14), #shopsTable td:nth-child(14) { white-space: nowrap; }
+      /* أعمدة النص ليها عرض أدنى؛ لو الشاشة أضيق، الجدول يتحرك أفقيًا بدل ما النص يتكسر */
+      #shopsTable th:nth-child(2), #shopsTable td:nth-child(2) { min-width: 140px; }
+      #shopsTable th:nth-child(3), #shopsTable td:nth-child(3) { min-width: 90px; }
+      #shopsTable th:nth-child(13), #shopsTable td:nth-child(13) { min-width: 190px; }
+    }
