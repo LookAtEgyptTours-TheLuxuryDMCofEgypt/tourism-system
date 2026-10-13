@@ -60,9 +60,10 @@ const translations = {
     sub_settlement_list: "2- سجل تصفيات الملفات",
     sub_settlement_archive: "3- الأرشيف (التصفيات المعتمدة)",
 
-    sub_add_ticket: "1- إضافة تذكرة مزار",
-    sub_tickets_list: "2- سجل التذاكر والمخزون",
-    sub_tickets_balance: "3- أرصدة التذاكر",
+    sub_add_ticket: "2- إضافة تذكرة مزار",
+    sub_ticket_attractions: "1- المزارات",
+    sub_tickets_list: "3- سجل التذاكر والمخزون",
+    sub_tickets_balance: "4- أرصدة التذاكر",
 
     sub_add_aviation: "1- إضافة حجز طيران",
     sub_aviation_list: "2- سجل حجوزات الطيران",
@@ -299,9 +300,10 @@ const translations = {
     sub_settlement_list: "2- Settlements Log",
     sub_settlement_archive: "3- Archive (Approved Settlements)",
 
-    sub_add_ticket: "1- Add Attraction Ticket",
-    sub_tickets_list: "2- Tickets & Inventory Log",
-    sub_tickets_balance: "3- Ticket Balances",
+    sub_add_ticket: "2- Add Attraction Ticket",
+    sub_ticket_attractions: "1- Attractions",
+    sub_tickets_list: "3- Tickets & Inventory Log",
+    sub_tickets_balance: "4- Ticket Balances",
 
     sub_add_aviation: "1- Add Flight Booking",
     sub_aviation_list: "2- Flight Bookings Log",
