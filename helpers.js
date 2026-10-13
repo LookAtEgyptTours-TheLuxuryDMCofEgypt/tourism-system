@@ -794,6 +794,64 @@
     `).join('');
     dropdown.style.display = 'block';
   }
+  // اقتراحات اسم المحل في مودال تعديل حركة المحل: أي محل اسمه فيه نفس الحروف/الكلمة المكتوبة (بتجاهل أ/ا و ة/ه والتشكيل)
+  function searchEditShopEntitySuggestions() {
+    const input = document.getElementById('editShopEntity');
+    const dropdown = document.getElementById('editShopEntitySuggestions');
+    if (!input || !dropdown) return;
+    const q = normalizeSearchText(input.value);
+    if (!q || !window.App) { dropdown.style.display = 'none'; return; }
+
+    const directory = (window.App.currentShopDirectory || [])
+      .filter(s => normalizeSearchText(s.name).includes(q))
+      .map(s => ({ name: s.name, extra: [s.region, s.type, s.commissionRate != null ? s.commissionRate + '%' : ''].filter(Boolean).join(' • ') }));
+    const known = new Set(directory.map(m => m.name));
+    const history = [...new Set((window.App.currentShops || []).map(s => s.entity))]
+      .filter(e => e && normalizeSearchText(e).includes(q) && !known.has(e))
+      .map(e => ({ name: e, extra: '' }));
+
+    const matched = [...directory, ...history];
+    if (matched.length === 0) { dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = matched.map(m => `
+      <div class="suggestion-item" data-name="${escapeHTML(m.name)}" onclick="selectEditShopEntitySuggestion(this.dataset.name)">
+        <span>${escapeHTML(m.name)}</span>
+        ${m.extra ? `<span style="font-size:12px; color:#94a3b8;">${escapeHTML(m.extra)}</span>` : ''}
+      </div>`).join('');
+    dropdown.style.display = 'block';
+  }
+
+  // عند اختيار محل من الاقتراحات: نكتب الاسم، ولو المحل موجود في الدليل نحدّث نوع المحل ونسبة العمولة منه
+  function selectEditShopEntitySuggestion(name) {
+    document.getElementById('editShopEntity').value = name;
+    document.getElementById('editShopEntitySuggestions').style.display = 'none';
+
+    const target = (name || '').trim().toLowerCase();
+    const shop = (window.App && window.App.currentShopDirectory || []).find(s => (s.name || '').trim().toLowerCase() === target);
+    if (!shop) return;
+
+    const typeSelect = document.getElementById('editShopShopType');
+    if (typeSelect && shop.type) {
+      const norm = s => String(s).replace(/[ةه]/g, 'ه').replace(/\s+/g, '').trim();
+      let opt = Array.from(typeSelect.options).find(o => o.value === String(shop.type).trim() || norm(o.value) === norm(shop.type));
+      if (!opt) {
+        opt = document.createElement('option'); opt.value = String(shop.type).trim(); opt.textContent = opt.value;
+        typeSelect.insertBefore(opt, Array.from(typeSelect.options).find(o => o.value === 'أخرى') || null);
+      }
+      typeSelect.value = opt.value;
+    }
+    const commissionInput = document.getElementById('editShopCommission');
+    const moveType = document.getElementById('editShopType');
+    if (commissionInput && shop.commissionRate != null && !(moveType && moveType.value === 'deduction')) {
+      commissionInput.value = shop.commissionRate;
+    }
+  }
+
+  // قفل قايمة الاقتراحات لما نضغط في أي مكان بره حقل اسم المحل
+  document.addEventListener('click', (e) => {
+    const dd = document.getElementById('editShopEntitySuggestions');
+    if (dd && dd.style.display !== 'none' && !e.target.closest('#editShopEntity') && !e.target.closest('#editShopEntitySuggestions')) dd.style.display = 'none';
+  });
+
   function selectShopEntitySuggestion(name) {
     document.getElementById('shopEntity').value = name;
     document.getElementById('shopEntitySuggestions').style.display = 'none';

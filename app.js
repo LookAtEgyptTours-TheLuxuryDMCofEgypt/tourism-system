@@ -143,12 +143,14 @@
     currentSettlements: [],
     currentShops: [],
     currentShopDirectory: [],
+    customAttractions: [],
 
     init() {
       this.listenToSuppliers();
       this.listenToCredit();
       this.listenToAviation();
       this.listenToTickets();
+      this.listenToTicketAttractions();
       this.listenToSettlements();
       this.listenToShops();
       this.listenToShopDirectory();
@@ -1428,10 +1430,18 @@
       });
     },
 
-    renderFixedTicketRows() {
+    renderFixedTicketRows(preserve = false) {
       const tbody = $('ticketItemsTableBody');
+      // لو بنحدّث القايمة بسبب إضافة/حذف مزار، نحتفظ بالكميات والتواريخ اللي اتكتبت بالفعل
+      const kept = {};
+      if (preserve) {
+        tbody.querySelectorAll('tr').forEach(tr => {
+          const name = tr.querySelector('.ticket-row-name')?.dataset.name;
+          if (name) kept[name] = { qty: tr.querySelector('.ticket-row-qty').value, expiry: tr.querySelector('.ticket-row-expiry').value };
+        });
+      }
       tbody.innerHTML = '';
-      TICKET_ATTRACTIONS.forEach(attraction => {
+      this.getAllAttractions().forEach(attraction => {
         const tr = document.createElement('tr');
 
         const nameTd = document.createElement('td');
@@ -1450,9 +1460,61 @@
         expiryInput.type = 'date'; expiryInput.className = 'ticket-row-expiry';
         expiryTd.appendChild(expiryInput);
 
+        if (kept[attraction]) { qtyInput.value = kept[attraction].qty; expiryInput.value = kept[attraction].expiry; }
         tr.appendChild(nameTd); tr.appendChild(qtyTd); tr.appendChild(expiryTd);
         tbody.appendChild(tr);
       });
+    },
+
+    // ===== المزارات: القايمة الأساسية + المزارات المضافة من صفحة "المزارات" =====
+    getAllAttractions() {
+      const list = [...TICKET_ATTRACTIONS];
+      (this.customAttractions || []).forEach(c => {
+        if (c.name && !list.some(n => normalizeArabicText(n) === normalizeArabicText(c.name))) list.push(c.name);
+      });
+      return list;
+    },
+
+    listenToTicketAttractions() {
+      onSnapshot(query(collection(db, "ticket_attractions"), orderBy("createdAt", "asc")), (snapshot) => {
+        this.customAttractions = [];
+        snapshot.forEach(d => { const data = d.data(); if (!data.isDeleted) this.customAttractions.push({ id: d.id, ...data }); });
+        this.renderFixedTicketRows(true);
+        this.renderTicketAttractionsPage();
+      }, (err) => console.error('attractions listener', err));
+    },
+
+    renderTicketAttractionsPage() {
+      const tbody = $('ticketAttractionsTableBody');
+      if (!tbody) return;
+      let html = ''; let idx = 1;
+      TICKET_ATTRACTIONS.forEach(name => {
+        html += `<tr><td>${idx++}</td><td><strong>${escapeHTML(name)}</strong></td><td><span class="badge">أساسي</span></td><td class="no-print">-</td></tr>`;
+      });
+      this.customAttractions.forEach(c => {
+        if (TICKET_ATTRACTIONS.some(n => normalizeArabicText(n) === normalizeArabicText(c.name))) return;
+        html += `<tr><td>${idx++}</td><td><strong>${escapeHTML(c.name)}</strong></td><td><span class="badge badge-deposit">مضاف</span></td><td class="no-print"><button class="delete-btn" onclick="App.deleteTicketAttraction('${c.id}')">${t('btn_delete')}</button></td></tr>`;
+      });
+      tbody.innerHTML = html;
+    },
+
+    async saveTicketAttraction() {
+      const input = $('newAttractionName');
+      const name = input.value.trim().replace(/\s+/g, ' ');
+      if (!name) return showToast('يرجى كتابة اسم المزار', 'error');
+      if (this.getAllAttractions().some(n => normalizeArabicText(n) === normalizeArabicText(name))) return showToast('المزار ده موجود بالفعل في القايمة', 'error');
+      const btn = $('btnSaveAttraction'); btn.disabled = true;
+      try {
+        await addDoc(collection(db, "ticket_attractions"), { name, createdAt: new Date() });
+        showToast('تم إضافة المزار بنجاح', 'success');
+        input.value = ''; input.focus();
+      } catch (e) { showToast(e.message, 'error'); }
+      btn.disabled = false;
+    },
+
+    async deleteTicketAttraction(id) {
+      if (!confirm('تأكيد حذف المزار من القايمة؟ (التذاكر المسجلة قبل كده مش هتتأثر)')) return;
+      try { await deleteDocAsync(doc(db, "ticket_attractions", id)); showToast(t('msg_deleted'), 'success'); } catch (e) { showToast(e.message, 'error'); }
     },
 
     resetTicketForm() {
@@ -1570,9 +1632,10 @@
     matchAttractionName(rawName) {
       const norm = normalizeArabicText(rawName);
       if (!norm) return null;
-      let found = TICKET_ATTRACTIONS.find(a => normalizeArabicText(a) === norm);
+      const all = this.getAllAttractions();
+      let found = all.find(a => normalizeArabicText(a) === norm);
       if (found) return found;
-      found = TICKET_ATTRACTIONS.find(a => norm.includes(normalizeArabicText(a)) || normalizeArabicText(a).includes(norm));
+      found = all.find(a => norm.includes(normalizeArabicText(a)) || normalizeArabicText(a).includes(norm));
       return found || null;
     },
 
@@ -1623,15 +1686,16 @@
       const nameSelect = $('editTicketName');
       nameSelect.innerHTML = '';
       const currentName = item.ticketName || '';
-      const options = TICKET_ATTRACTIONS.includes(currentName) || !currentName
-        ? TICKET_ATTRACTIONS
-        : [currentName, ...TICKET_ATTRACTIONS];
+      const allAttractions = this.getAllAttractions();
+      const options = allAttractions.includes(currentName) || !currentName
+        ? allAttractions
+        : [currentName, ...allAttractions];
       options.forEach(name => {
         const opt = document.createElement('option');
         opt.value = name; opt.textContent = name;
         nameSelect.appendChild(opt);
       });
-      nameSelect.value = currentName || TICKET_ATTRACTIONS[0];
+      nameSelect.value = currentName || allAttractions[0];
 
       $('editTicketGuide').value = item.guideName || '';
       $('editTicketQty').value = item.qty || '';

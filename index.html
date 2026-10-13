@@ -129,6 +129,7 @@
           <button class="sub-tab-btn active" onclick="openSubTab(event, 'addTicketSubTab', 'ticketsTab')" data-i18n="sub_add_ticket">1- إضافة تذكرة مزار</button>
           <button class="sub-tab-btn" onclick="openSubTab(event, 'ticketsListSubTab', 'ticketsTab')" data-i18n="sub_tickets_list">2- سجل التذاكر والمخزون</button>
           <button class="sub-tab-btn" onclick="openSubTab(event, 'ticketsBalanceSubTab', 'ticketsTab')" data-i18n="sub_tickets_balance">3- أرصدة التذاكر</button>
+          <button class="sub-tab-btn" onclick="openSubTab(event, 'ticketAttractionsSubTab', 'ticketsTab')">4- المزارات</button>
         </div>
 
         <button class="tab-btn" id="shopsBtn" onclick="toggleShopsMenu(event)">
@@ -953,6 +954,34 @@
             </div>
           </div>
         </div>
+
+        <!-- 4. المزارات -->
+        <div id="ticketAttractionsSubTab" class="sub-tab-content">
+          <h3>إضافة مزار جديد</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>اسم المزار</label>
+              <input type="text" id="newAttractionName" placeholder="اكتب اسم المزار..." autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();App.saveTicketAttraction();}">
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="submit-btn" id="btnSaveAttraction" onclick="App.saveTicketAttraction()">➕ إضافة المزار</button>
+          </div>
+
+          <h3 style="margin-top:28px;">قائمة المزارات</h3>
+          <p style="color:#64748b; font-size:13px; margin:0 0 10px;">المزارات الأساسية ثابتة، والمزارات اللي بتضيفها بتظهر تلقائيًا في صفحة إضافة التذاكر وتعديل التذكرة واستيراد Excel.</p>
+          <div class="table-wrapper">
+            <table id="ticketAttractionsTable">
+              <thead>
+                <tr><th>#</th><th>اسم المزار</th><th>النوع</th><th class="no-print">إجراءات</th></tr>
+              </thead>
+              <tbody id="ticketAttractionsTableBody">
+                <tr><td colspan="4" style="text-align:center;">جاري التحميل...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
       <div id="shopsTab" class="tab-content">
@@ -1071,6 +1100,7 @@
             <div class="table-wrapper"><table id="shopSummaryTable"><thead><tr><th>#</th><th data-i18n="lbl_shop">المحل</th><th data-i18n="lbl_currency">العملة</th><th data-i18n="lbl_total_debit">إجمالي المدين</th><th data-i18n="lbl_total_credit">إجمالي الدائن</th><th data-i18n="lbl_net_balance">صافي الرصيد</th><th data-i18n="lbl_status">الحالة</th></tr></thead><tbody id="shopSummaryTableBody"><tr><td colspan="7" style="text-align:center;" data-i18n="msg_calculating">جاري الحساب...</td></tr></tbody></table></div>
           </div>
         </div>
+
       </div>
 
     </div>
@@ -1211,7 +1241,7 @@
     <h3 data-i18n="h_edit_shop">تعديل حركة المحل</h3>
     <input type="hidden" id="editShopId">
     <div class="form-row">
-      <div class="form-group"><label data-i18n="lbl_shop_name">اسم المحل</label><input type="text" id="editShopEntity"></div>
+      <div class="form-group" style="position:relative;"><label data-i18n="lbl_shop_name">اسم المحل</label><input type="text" id="editShopEntity" autocomplete="off" oninput="searchEditShopEntitySuggestions()" onfocus="searchEditShopEntitySuggestions()"><div id="editShopEntitySuggestions" class="suggestions-dropdown" style="display:none;"></div></div>
       <div class="form-group"><label data-i18n="lbl_guide_name">اسم المرشد</label><input type="text" id="editShopGuideName"></div>
     </div>
     <div class="form-row">
