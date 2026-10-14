@@ -11,6 +11,7 @@ const translations = {
     header_subtitle: "🔓 وضع المستقل | الإدارة العامة",
 
     nav_dashboard: "📈 Dashboard الرئيسية",
+    nav_audit: "🗑️ المحذوفات والتغييرات",
     nav_accounts: "🧮 الحسابات",
     nav_tax_discount: "📋 الخصم والإضافة",
     nav_credit: "💳 أرصدة الكريديت",
@@ -252,6 +253,7 @@ const translations = {
     header_subtitle: "🔓 Freelance Mode | General Management",
 
     nav_dashboard: "📈 Main Dashboard",
+    nav_audit: "🗑️ Trash & Changes",
     nav_accounts: "🧮 Accounts",
     nav_tax_discount: "📋 Discounts & Additions",
     nav_credit: "💳 Credit Balances",

@@ -1,7 +1,7 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { 
-    getFirestore, collection, addDoc, updateDoc, doc, 
-    onSnapshot, query, orderBy 
+    getFirestore, collection, addDoc as fsAddDoc, updateDoc as fsUpdateDoc, doc, 
+    onSnapshot, query, orderBy, getDocs, where, limit 
   } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
   import {
     getAuth, signInAnonymously, onAuthStateChanged
@@ -20,9 +20,86 @@
   const db = getFirestore(app);
   const auth = getAuth(app);
 
+  // ===== هوية المستخدم + سجل التغييرات (Audit Log) =====
+  // الحذف دايمًا "ناعم" (isDeleted) عشان نقدر نسترجع من سلة المحذوفات، وكل تعديل/حذف/استرجاع بيتسجل في audit_log
+  const AUDIT_SECTIONS = {
+    settlement_records: { label: 'تصفية الأوبريتور', list: 'currentSettlements', describe: r => [r.fileCode, r.guideName].filter(Boolean).join(' — ') },
+    shop_balances: { label: 'حركات المحلات', list: 'currentShops', describe: r => [r.entity, r.amount != null ? r.amount + ' ' + (r.currency || '') : ''].filter(Boolean).join(' — ') },
+    shop_directory: { label: 'دليل المحلات', list: 'currentShopDirectory', describe: r => r.name || '' },
+    credit_balances: { label: 'أرصدة الكريديت', list: 'currentCredit', describe: r => [r.entity, r.fileCode, r.amount != null ? r.amount + ' ' + (r.currency || '') : ''].filter(Boolean).join(' — ') },
+    aviation_records: { label: 'حجوزات الطيران', list: 'currentAviation', describe: r => [r.airlineName, r.pnrNumber, r.passengerName].filter(Boolean).join(' — ') },
+    ticket_records: { label: 'مخزون التذاكر', list: 'currentTickets', describe: r => [r.ticketName, r.fileCode, r.qty != null ? 'كمية ' + r.qty : ''].filter(Boolean).join(' — ') },
+    ticket_attractions: { label: 'المزارات', list: 'customAttractions', describe: r => r.name || '' },
+    tax_discount_records: { label: 'الخصم والإضافة', list: 'currentSuppliers', describe: r => [r.propertyName, r.supplierName].filter(Boolean).join(' — ') }
+  };
+  const AUDIT_FIELD_LABELS = {
+    fileCode: 'كود الملف', guideName: 'اسم الأوبريتور', fileName: 'اسم الملف', revenue: 'الإيرادات', expenses: 'المصروفات', currency: 'العملة',
+    exchangeRate: 'سعر الصرف', paxCount: 'عدد الأفراد', fileType: 'نوع الملف', notes: 'ملاحظات', isApproved: 'الاعتماد', entity: 'الجهة/المحل',
+    amount: 'المبلغ', type: 'النوع', commission: 'العمولة', commissionRate: 'نسبة العمولة', description: 'البيان', period: 'الفترة', shopType: 'نوع المحل',
+    name: 'الاسم', region: 'المنطقة', ticketName: 'المزار', qty: 'الكمية', expiryDate: 'تاريخ الصلاحية', action: 'الحركة', airlineName: 'شركة الطيران',
+    pnrNumber: 'PNR', ticketNumber: 'رقم التذكرة', passengerName: 'اسم المسافر', operatorName: 'الأوبريتور', passengersCount: 'عدد المسافرين',
+    sellingPrice: 'سعر البيع', ticketCost: 'تكلفة التذكرة', transactionType: 'نوع العملية', arrivalDate: 'تاريخ الوصول', departureDate: 'تاريخ المغادرة',
+    propertyName: 'اسم المنشأة', supplierName: 'اسم المورد', taxCardNumber: 'رقم البطاقة الضريبية', taxRate: 'نسبة الضريبة', supplierType: 'نوع المورد',
+    isDeleted: 'محذوف', issueDate: 'تاريخ الإصدار', sellingCurrency: 'عملة البيع'
+  };
+  const AUDIT_IGNORED_FIELDS = new Set(['updatedAt', 'updatedBy', 'deletedAt', 'deletedBy', 'restoredAt', 'createdAt', 'createdBy']);
+
+  const getActor = () => {
+    let name = '';
+    try { name = (localStorage.getItem('actorName') || '').trim(); } catch (e) { /* ignore */ }
+    const role = sessionStorage.getItem('authRole') || 'unknown';
+    const device = auth.currentUser && auth.currentUser.uid ? auth.currentUser.uid.slice(0, 6) : '-';
+    return { name, role, device, label: (name ? name + ' · ' : '') + role + '#' + device };
+  };
+
+  const auditValue = (v) => {
+    if (v == null) return '';
+    if (v && typeof v.toDate === 'function') v = v.toDate();
+    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    const s = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    return s.length > 80 ? s.slice(0, 77) + '…' : s;
+  };
+
+  const writeAudit = (entry) => {
+    // مش بنستنى النتيجة ومش بنوقف العملية الأساسية لو التسجيل فشل
+    fsAddDoc(collection(db, 'audit_log'), { ...entry, at: new Date() }).catch(e => console.warn('audit log failed', e));
+  };
+
+  // كل الإضافات بتتسجّل بمين عملها، وكل التعديلات بتتسجّل بمين ومتى (updatedAt/updatedBy) + سطر في سجل التغييرات
+  const addDoc = (colRef, data) => fsAddDoc(colRef, { ...data, createdBy: getActor().label });
+
+  const updateDoc = async (ref, data, meta = {}) => {
+    const col = String(ref.path || '').split('/')[0];
+    const section = AUDIT_SECTIONS[col];
+    const actor = getActor();
+    await fsUpdateDoc(ref, { ...data, updatedAt: new Date(), updatedBy: actor.label });
+    if (!section) return;
+
+    const old = (App[section.list] || []).find(r => r.id === ref.id) || null;
+    let action = 'update';
+    if (data.isDeleted === true) action = 'delete';
+    else if (data.isDeleted === false && data.restoredAt) action = 'restore';
+
+    const changes = {};
+    if (action === 'update') {
+      Object.keys(data).forEach(k => {
+        if (AUDIT_IGNORED_FIELDS.has(k)) return;
+        const from = old ? auditValue(old[k]) : '', to = auditValue(data[k]);
+        if (from !== to) changes[k] = { from, to };
+      });
+      if (old && Object.keys(changes).length === 0) return; // مفيش تغيير فعلي
+    }
+    writeAudit({
+      action, collection: col, collectionLabel: section.label, docId: ref.id,
+      label: meta.label || (old ? section.describe(old) : ''), changes,
+      by: actor.label, byName: actor.name, role: actor.role
+    });
+  };
+
   const deleteDocAsync = async (documentReference) => updateDoc(documentReference, {
     isDeleted: true,
-    deletedAt: new Date()
+    deletedAt: new Date(),
+    deletedBy: getActor().label
   });
 
   const $ = (id) => document.getElementById(id);
@@ -1510,6 +1587,123 @@
         input.value = ''; input.focus();
       } catch (e) { showToast(e.message, 'error'); }
       btn.disabled = false;
+    },
+
+    // ===== سلة المحذوفات + سجل التغييرات =====
+    trashItems: [],
+    auditItems: [],
+
+    openAuditPage() {
+      const nameInput = $('actorNameInput');
+      if (nameInput) { try { nameInput.value = localStorage.getItem('actorName') || ''; } catch (e) { /* ignore */ } }
+      const sectionOptions = '<option value="">كل الأقسام</option>' + Object.entries(AUDIT_SECTIONS).map(([k, s]) => `<option value="${k}">${s.label}</option>`).join('');
+      ['trashSectionFilter', 'auditSectionFilter'].forEach(id => {
+        const el = $(id); if (!el) return; const cur = el.value; el.innerHTML = sectionOptions; el.value = cur;
+      });
+      this.loadTrash();
+      this.loadAuditLog();
+    },
+
+    switchAuditPane(pane) {
+      $('auditPaneTrash').style.display = pane === 'trash' ? 'block' : 'none';
+      $('auditPaneLog').style.display = pane === 'log' ? 'block' : 'none';
+      $('auditPaneTrashBtn').className = pane === 'trash' ? 'submit-btn' : 'print-btn';
+      $('auditPaneLogBtn').className = pane === 'log' ? 'submit-btn' : 'print-btn';
+    },
+
+    saveActorName() {
+      const v = $('actorNameInput').value.trim();
+      try { localStorage.setItem('actorName', v); } catch (e) { /* ignore */ }
+      showToast(v ? 'تم حفظ الاسم، هيتسجل مع أي تعديل أو حذف' : 'تم مسح الاسم', 'success');
+    },
+
+    async loadTrash() {
+      const tbody = $('trashTableBody'); if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">جاري التحميل...</td></tr>';
+      try {
+        const results = await Promise.all(Object.keys(AUDIT_SECTIONS).map(async col => {
+          const snap = await getDocs(query(collection(db, col), where('isDeleted', '==', true)));
+          const items = []; snap.forEach(d => items.push({ col, id: d.id, data: d.data() })); return items;
+        }));
+        const toMs = (v) => (v && typeof v.toDate === 'function') ? v.toDate().getTime() : (v instanceof Date ? v.getTime() : 0);
+        this.trashItems = results.flat().sort((x, y) => toMs(y.data.deletedAt) - toMs(x.data.deletedAt));
+        this.renderTrash();
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#dc2626;">تعذر تحميل المحذوفات: ${escapeHTML(e.message)}</td></tr>`;
+      }
+    },
+
+    renderTrash() {
+      const tbody = $('trashTableBody'); if (!tbody) return;
+      const section = $('trashSectionFilter').value;
+      const q = normalizeSearchText($('trashSearch').value);
+      const rows = this.trashItems.filter(it => (!section || it.col === section) &&
+        (!q || normalizeSearchText(AUDIT_SECTIONS[it.col].describe(it.data) + ' ' + AUDIT_SECTIONS[it.col].label).includes(q)));
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">سلة المحذوفات فاضية</td></tr>'; return; }
+      const fmtDate = (v) => (v && typeof v.toDate === 'function') ? v.toDate().toLocaleString('en-GB') : '-';
+      tbody.innerHTML = rows.map((it, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><span class="badge">${escapeHTML(AUDIT_SECTIONS[it.col].label)}</span></td>
+          <td><strong>${escapeHTML(AUDIT_SECTIONS[it.col].describe(it.data) || '-')}</strong></td>
+          <td style="white-space:nowrap;">${fmtDate(it.data.deletedAt)}</td>
+          <td><bdi>${escapeHTML(it.data.deletedBy || it.data.updatedBy || '-')}</bdi></td>
+          <td class="no-print"><button class="approve-btn" onclick="App.restoreTrashItem('${it.col}','${it.id}')">↩️ استرجاع</button></td>
+        </tr>`).join('');
+    },
+
+    async restoreTrashItem(col, id) {
+      const item = this.trashItems.find(it => it.col === col && it.id === id); if (!item) return;
+      const section = AUDIT_SECTIONS[col]; const label = section.describe(item.data);
+      // منع تكرار اسم موجود بالفعل في القوائم اللي الاسم فيها لازم يكون فريد
+      if (col === 'shop_directory' && this.isDuplicate(this.currentShopDirectory, 'name', item.data.name)) return showToast('فيه محل بنفس الاسم موجود حاليًا، مينفعش الاسترجاع', 'error');
+      if (col === 'ticket_attractions' && this.getAllAttractions().some(n => normalizeArabicText(n) === normalizeArabicText(item.data.name || ''))) return showToast('المزار ده موجود بالفعل في القايمة', 'error');
+      if (col === 'settlement_records' && this.isDuplicateSettlement(item.data.fileCode, item.data.guideName)) {
+        if (!confirm('فيه تصفية بنفس رقم الملف والأوبريتور موجودة حاليًا. هل تريد الاسترجاع برضه؟')) return;
+      } else if (!confirm(`استرجاع "${label || section.label}"؟`)) return;
+      try {
+        await updateDoc(doc(db, col, id), { isDeleted: false, deletedAt: null, restoredAt: new Date() }, { label });
+        this.trashItems = this.trashItems.filter(it => !(it.col === col && it.id === id));
+        this.renderTrash();
+        showToast('تم الاسترجاع بنجاح', 'success');
+        this.loadAuditLog();
+      } catch (e) { showToast(e.message, 'error'); }
+    },
+
+    async loadAuditLog() {
+      const tbody = $('auditTableBody'); if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">جاري التحميل...</td></tr>';
+      try {
+        const snap = await getDocs(query(collection(db, 'audit_log'), orderBy('at', 'desc'), limit(300)));
+        this.auditItems = []; snap.forEach(d => this.auditItems.push({ id: d.id, ...d.data() }));
+        this.renderAuditLog();
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#dc2626;">تعذر تحميل السجل: ${escapeHTML(e.message)}</td></tr>`;
+      }
+    },
+
+    renderAuditLog() {
+      const tbody = $('auditTableBody'); if (!tbody) return;
+      const section = $('auditSectionFilter').value, action = $('auditActionFilter').value;
+      const q = normalizeSearchText($('auditSearch').value);
+      const actionMeta = { update: ['تعديل', 'badge-advance'], delete: ['حذف', 'badge-deduction'], restore: ['استرجاع', 'badge-deposit'] };
+      const rows = this.auditItems.filter(e => (!section || e.collection === section) && (!action || e.action === action) &&
+        (!q || normalizeSearchText([e.label, e.by, e.collectionLabel].join(' ')).includes(q)));
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">مفيش تغييرات مسجلة</td></tr>'; return; }
+      tbody.innerHTML = rows.map(e => {
+        const when = (e.at && typeof e.at.toDate === 'function') ? e.at.toDate().toLocaleString('en-GB') : '-';
+        const [actionLabel, cls] = actionMeta[e.action] || [e.action, 'badge'];
+        const details = Object.entries(e.changes || {}).map(([k, v]) =>
+          `<div><span style="color:#64748b;">${escapeHTML(AUDIT_FIELD_LABELS[k] || k)}:</span> <s style="color:#dc2626;">${escapeHTML(v.from || '—')}</s> ← <b style="color:#16a34a;">${escapeHTML(v.to || '—')}</b></div>`).join('') || '-';
+        return `<tr>
+          <td style="white-space:nowrap;">${when}</td>
+          <td>${escapeHTML(e.collectionLabel || e.collection || '-')}</td>
+          <td><span class="badge ${cls}">${actionLabel}</span></td>
+          <td><strong>${escapeHTML(e.label || '-')}</strong></td>
+          <td style="text-align:right; min-width:220px;">${details}</td>
+          <td><bdi>${escapeHTML(e.by || '-')}</bdi></td>
+        </tr>`;
+      }).join('');
     },
 
     async deleteTicketAttraction(id) {
