@@ -820,7 +820,7 @@
               <td>${badge}</td>
               <td style="font-weight:700;">${amountVal.toLocaleString()}</td>
               <td>${escapeHTML(data.currency || 'EGP')}</td>
-              <td>${commissionPct != null ? commissionPct + '%' : '-'}</td>
+              <td>${commissionPct != null ? commissionPct + '%' : (data.type === 'deposit' ? '<span class="badge badge-advance" title="الحركة دي مدين من غير نسبة عمولة، فمبلغها مش داخل في حساب المدين (لنا)">⚠️ بدون عمولة</span>' : '-')}</td>
               <td style="font-weight:700; color:#7c3aed;">${commissionAmount != null ? commissionAmount.toLocaleString(undefined, {maximumFractionDigits: 2}) : '-'}</td>
               <td>${statusBadge}</td>
               <td>${escapeHTML(data.description || '-')}</td>
@@ -854,6 +854,7 @@
 
       if (!entity || isNaN(amount) || amount <= 0) return showToast(t('msg_enter_shop_amount'), 'error');
       if (commission != null && !isNaN(commission) && (commission < 0 || commission > 100)) return showToast('نسبة العمولة يجب أن تكون بين 0 و 100', 'error');
+      if (type === 'deposit' && commission == null && !confirm('الحركة دي "مدين" ومفيهاش نسبة عمولة، فمبلغها مش هيدخل في حساب "المدين (لنا)" في الملخص والـ Dashboard (الحساب بيتحسب بنسبة العمولة). تكمل من غير عمولة؟')) return;
 
       const btn = $('btnSaveShop'); btn.disabled = true;
       try {
@@ -912,6 +913,7 @@
 
       if (!entity || isNaN(amount) || amount <= 0) return showToast(t('msg_enter_shop_amount'), 'error');
       if (commission != null && !isNaN(commission) && (commission < 0 || commission > 100)) return showToast('نسبة العمولة يجب أن تكون بين 0 و 100', 'error');
+      if (type === 'deposit' && commission == null && !confirm('الحركة دي "مدين" ومفيهاش نسبة عمولة، فمبلغها مش هيدخل في حساب "المدين (لنا)" في الملخص والـ Dashboard (الحساب بيتحسب بنسبة العمولة). تكمل من غير عمولة؟')) return;
 
       try {
         await updateDoc(doc(db, "shop_balances", id), {
@@ -947,6 +949,7 @@
 
     updateShopsDashboard() {
       const byCurrencyDebit = {}, byCurrencyCredit = {};
+      const noCommissionByCurrency = {}; // مبالغ حركات "مدين" من غير نسبة عمولة (مش داخلة في المدين لنا)
       const grouped = {};
 
       this.currentShops.forEach(s => {
@@ -960,10 +963,23 @@
         else byCurrencyCredit[cur] = (byCurrencyCredit[cur] || 0) + amt;
 
         const key = `${s.entity}_${cur}`;
-        if (!grouped[key]) grouped[key] = { entity: s.entity, currency: cur, debit: 0, credit: 0 };
+        if (!grouped[key]) grouped[key] = { entity: s.entity, currency: cur, debit: 0, credit: 0, noCommission: 0, noCommissionCount: 0 };
         if (s.type === 'deposit') grouped[key].debit += commissionAmount;
         else grouped[key].credit += amt;
+        if (s.type === 'deposit' && commissionPct == null) {
+          grouped[key].noCommission += amt; grouped[key].noCommissionCount += 1;
+          const w = noCommissionByCurrency[cur] || (noCommissionByCurrency[cur] = { amount: 0, count: 0 });
+          w.amount += amt; w.count += 1;
+        }
       });
+
+      // تنبيه في الـ Dashboard لو فيه حركات مدين من غير عمولة
+      const warnEl = $('shopDashWarning');
+      if (warnEl) {
+        const parts = Object.entries(noCommissionByCurrency).map(([cur, w]) => `${w.count} حركة (${cur} ${w.amount.toLocaleString(undefined, {maximumFractionDigits: 2})})`);
+        warnEl.style.display = parts.length ? 'block' : 'none';
+        warnEl.innerHTML = parts.length ? `⚠️ فيه حركات "مدين" من غير نسبة عمولة: ${parts.join(' + ')} — مبالغها <b>مش داخلة</b> في حساب "المدين (لنا)"، لأن الحساب بيتحسب بنسبة العمولة. افتح الحركة من سجل العمليات واضغط "تعديل" وحط نسبة العمولة.` : '';
+      }
 
       const allCurrencies = Array.from(new Set([...Object.keys(byCurrencyDebit), ...Object.keys(byCurrencyCredit)]));
 
@@ -999,10 +1015,11 @@
             <td style="color:#dc2626; font-weight:700;">${g.credit.toLocaleString()}</td>
             <td style="font-weight:800;">${net.toLocaleString()}</td>
             <td>${statusBadge}</td>
+            <td>${g.noCommission > 0 ? `<span style="color:#b45309; font-weight:700;" title="حركات مدين من غير نسبة عمولة">⚠️ ${g.noCommission.toLocaleString(undefined, {maximumFractionDigits: 2})} (${g.noCommissionCount})</span>` : '-'}</td>
           </tr>
         `;
       });
-      tbody.innerHTML = html || `<tr><td colspan="7" style="text-align:center;">${t('msg_no_data')}</td></tr>`;
+      tbody.innerHTML = html || `<tr><td colspan="8" style="text-align:center;">${t('msg_no_data')}</td></tr>`;
     },
 
     // دليل المحلات (Shop Directory) - بيانات ثابتة لكل محل: الاسم، المنطقة، النوع، العمولة
