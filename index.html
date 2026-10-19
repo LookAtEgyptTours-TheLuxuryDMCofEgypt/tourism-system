@@ -1054,7 +1054,9 @@
             <div class="form-group"><label data-i18n="lbl_shop_type">نوع المحل</label>
               <input type="text" id="shopDirType" list="shopTypesList" autocomplete="off" placeholder="اختر نوع أو اكتب نوع جديد..." data-i18n-placeholder="ph_shop_type_open">
             </div>
-            <div class="form-group"><label data-i18n="lbl_commission">العمولة</label><input type="number" id="shopDirCommission" placeholder="النسبة %" data-i18n-placeholder="ph_commission" step="any" min="0" max="100"></div>
+            <div class="form-group"><label>طريقة العمولة</label><select id="shopDirFeeMode" onchange="toggleShopDirFeeMode('shopDir')"><option value="percent">نسبة %</option><option value="fixed">مبلغ ثابت للوحدة</option></select></div>
+            <div id="shopDirCommissionWrap" data-show="contents" style="display:contents;"><div class="form-group"><label data-i18n="lbl_commission">العمولة</label><input type="number" id="shopDirCommission" placeholder="النسبة %" data-i18n-placeholder="ph_commission" step="any" min="0" max="100"></div></div>
+            <div class="form-group" id="shopDirFixedWrap" style="display:none;"><label>المبلغ الثابت للوحدة</label><div class="amount-input-group"><input type="number" id="shopDirFixedAmount" step="any" min="0" placeholder="مثلاً 2"><select id="shopDirFixedCurrency"><option value="USD">USD</option><option value="EGP">EGP</option><option value="EUR">EUR</option><option value="JPY">JPY</option></select></div></div>
           </div>
           <div class="btn-group">
             <button class="submit-btn" id="btnSaveShopDirectory" onclick="App.saveShopDirectory()" data-i18n="btn_save_shop">حفظ المحل</button>
@@ -1114,6 +1116,7 @@
               </div>
             </div>
             <div class="form-group"><label data-i18n="lbl_commission">العمولة</label><input type="number" id="shopCommission" placeholder="النسبة %" data-i18n-placeholder="ph_commission" step="any" min="0" max="100"></div>
+            <div class="form-group" id="shopQuantityWrap" style="display:none;"><label>العدد</label><input type="number" id="shopQuantity" min="1" step="1" inputmode="numeric" placeholder="عدد القطع..." oninput="updateShopFixedHint(false)"><small id="shopFixedHint" style="display:block; margin-top:4px; color:#16a34a; font-weight:700;"></small></div>
           </div>
           <div class="form-group"><label data-i18n="lbl_description">البيان</label><textarea id="shopDescription" placeholder="تفاصيل الحركة..." data-i18n-placeholder="ph_transaction_details"></textarea></div>
           <div class="btn-group">
@@ -1279,7 +1282,9 @@
     <div class="form-group"><label data-i18n="lbl_shop_type">نوع المحل</label>
       <input type="text" id="editShopDirType" list="shopTypesList" autocomplete="off" placeholder="اختر نوع أو اكتب نوع جديد..." data-i18n-placeholder="ph_shop_type_open">
     </div>
-    <div class="form-group"><label data-i18n="lbl_commission">العمولة</label><input type="number" id="editShopDirCommission" step="any" min="0" max="100"></div>
+    <div class="form-group"><label>طريقة العمولة</label><select id="editShopDirFeeMode" onchange="toggleShopDirFeeMode('editShopDir')"><option value="percent">نسبة %</option><option value="fixed">مبلغ ثابت للوحدة</option></select></div>
+    <div id="editShopDirCommissionWrap"><div class="form-group"><label data-i18n="lbl_commission">العمولة</label><input type="number" id="editShopDirCommission" step="any" min="0" max="100"></div></div>
+    <div class="form-group" id="editShopDirFixedWrap" style="display:none;"><label>المبلغ الثابت للوحدة</label><div class="amount-input-group"><input type="number" id="editShopDirFixedAmount" step="any" min="0" placeholder="مثلاً 2"><select id="editShopDirFixedCurrency"><option value="USD">USD</option><option value="EGP">EGP</option><option value="EUR">EUR</option><option value="JPY">JPY</option></select></div></div>
     <div class="btn-group" style="justify-content:flex-end;">
       <button class="submit-btn" onclick="App.saveEditedShopDirectory()" data-i18n="btn_save_edits">حفظ التعديلات</button>
       <button class="print-btn" onclick="App.closeShopDirectoryEditModal()" data-i18n="btn_cancel">إلغاء</button>
@@ -1342,6 +1347,7 @@
         </div>
       </div>
       <div class="form-group"><label data-i18n="lbl_commission">العمولة</label><input type="number" id="editShopCommission" step="any" min="0" max="100"></div>
+      <div class="form-group" id="editShopQuantityWrap" style="display:none;"><label>العدد</label><input type="number" id="editShopQuantity" min="1" step="1" inputmode="numeric" placeholder="عدد القطع..." oninput="updateShopFixedHint(true)"><small id="editShopFixedHint" style="display:block; margin-top:4px; color:#16a34a; font-weight:700;"></small></div>
     </div>
     <div class="form-group"><label data-i18n="lbl_description">البيان</label><textarea id="editShopDescription"></textarea></div>
     <div class="btn-group" style="justify-content:flex-end;">

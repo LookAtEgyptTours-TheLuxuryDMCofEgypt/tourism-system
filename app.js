@@ -40,6 +40,7 @@
     pnrNumber: 'PNR', ticketNumber: 'رقم التذكرة', passengerName: 'اسم المسافر', operatorName: 'الأوبريتور', passengersCount: 'عدد المسافرين',
     sellingPrice: 'سعر البيع', ticketCost: 'تكلفة التذكرة', transactionType: 'نوع العملية', arrivalDate: 'تاريخ الوصول', departureDate: 'تاريخ المغادرة',
     propertyName: 'اسم المنشأة', supplierName: 'اسم المورد', taxCardNumber: 'رقم البطاقة الضريبية', taxRate: 'نسبة الضريبة', supplierType: 'نوع المورد',
+    quantity: 'العدد', unitAmount: 'سعر الوحدة', feeMode: 'طريقة العمولة', fixedUnitAmount: 'المبلغ الثابت للوحدة', fixedCurrency: 'عملة المبلغ الثابت',
     isDeleted: 'محذوف', issueDate: 'تاريخ الإصدار', sellingCurrency: 'عملة البيع'
   };
   const AUDIT_IGNORED_FIELDS = new Set(['updatedAt', 'updatedBy', 'deletedAt', 'deletedBy', 'restoredAt', 'createdAt', 'createdBy']);
@@ -803,8 +804,9 @@
           const dateStr = data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleDateString('en-GB') : '-';
 
           const amountVal = parseFloat(data.amount) || 0;
-          const commissionPct = (data.commission != null && data.commission !== '') ? parseFloat(data.commission) : null;
-          const commissionAmount = commissionPct != null ? (amountVal * commissionPct / 100) : null;
+          const debitInfo = this.getShopDebitInfo(data);
+          const commissionPct = debitInfo.pct;
+          const commissionAmount = debitInfo.mode === 'credit' || debitInfo.mode === 'none' ? null : debitInfo.commissionAmount;
           const statusBadge = data.type === 'deposit'
             ? `<span class="badge badge-advance">${t('status_under_collection')}</span>`
             : `<span class="badge badge-deposit">${t('status_collected')}</span>`;
@@ -820,7 +822,7 @@
               <td>${badge}</td>
               <td style="font-weight:700;">${amountVal.toLocaleString()}</td>
               <td>${escapeHTML(data.currency || 'EGP')}</td>
-              <td>${commissionPct != null ? commissionPct + '%' : (data.type === 'deposit' ? '<span class="badge badge-advance" title="الحركة دي مدين من غير نسبة عمولة، فمبلغها مش داخل في حساب المدين (لنا)">⚠️ بدون عمولة</span>' : '-')}</td>
+              <td>${debitInfo.mode === 'fixed' ? `<span class="badge badge-deposit" title="مبلغ ثابت للوحدة">${data.quantity != null && data.unitAmount != null ? data.quantity + ' × ' + data.unitAmount : 'مبلغ ثابت'}</span>` : commissionPct != null ? commissionPct + '%' : (data.type === 'deposit' ? '<span class="badge badge-advance" title="الحركة دي مدين من غير نسبة عمولة، فمبلغها مش داخل في حساب المدين (لنا)">⚠️ بدون عمولة</span>' : '-')}</td>
               <td style="font-weight:700; color:#7c3aed;">${commissionAmount != null ? commissionAmount.toLocaleString(undefined, {maximumFractionDigits: 2}) : '-'}</td>
               <td>${statusBadge}</td>
               <td>${escapeHTML(data.description || '-')}</td>
@@ -838,6 +840,19 @@
       });
     },
 
+    // إيه اللي بتضيفه حركة المحل على "المدين (لنا)":
+    //  - مبلغ ثابت (العدد × سعر الوحدة): المبلغ كله | - نسبة عمولة: المبلغ × النسبة | - من غير عمولة: صفر
+    getShopDebitInfo(s) {
+      const amt = parseFloat(s.amount) || 0;
+      if (s.type !== 'deposit') return { mode: 'credit', pct: null, commissionAmount: 0 };
+      if (s.feeMode === 'fixed') return { mode: 'fixed', pct: null, commissionAmount: amt };
+      const pct = (s.commission != null && s.commission !== '') ? parseFloat(s.commission) : null;
+      if (pct != null) return { mode: 'percent', pct, commissionAmount: amt * pct / 100 };
+      // حركات قديمة اتسجلت قبل تحديد المبلغ الثابت: لو المحل حاليًا بمبلغ ثابت في الدليل، المبلغ كله هو المستحق
+      if (getFixedFeeShop(s.entity)) return { mode: 'fixed', pct: null, commissionAmount: amt, legacy: true };
+      return { mode: 'none', pct: null, commissionAmount: 0 };
+    },
+
     async saveShop() {
       const entity = $('shopEntity').value.trim();
       const guideName = $('shopGuideName').value.trim();
@@ -845,24 +860,37 @@
       const fileCode = $('shopFileCode').value.trim();
       const period = $('shopPeriod').value;
       const type = $('shopType').value;
-      const amount = parseFloat($('shopAmount').value);
-      const currency = $('shopCurrency').value;
+      let amount = parseFloat($('shopAmount').value);
+      let currency = $('shopCurrency').value;
       const commissionRaw = $('shopCommission').value;
       // في حالة "دائن (المحصل)" المبلغ محصل بالكامل من المحل فلا تُحتسب عمولة
       const commission = (type === 'deduction' || commissionRaw === '') ? null : parseFloat(commissionRaw);
       const description = $('shopDescription').value.trim();
 
+      // محل بمبلغ ثابت: الإجمالي = العدد × سعر الوحدة
+      const fixedShop = type === 'deposit' ? getFixedFeeShop(entity) : null;
+      let quantity = null, unitAmount = null;
+      if (fixedShop) {
+        quantity = parseInt($('shopQuantity').value);
+        if (!(quantity > 0)) return showToast('يرجى إدخال العدد', 'error');
+        unitAmount = parseFloat(fixedShop.fixedUnitAmount);
+        amount = quantity * unitAmount;
+        currency = fixedShop.fixedCurrency || currency;
+      }
+
       if (!entity || isNaN(amount) || amount <= 0) return showToast(t('msg_enter_shop_amount'), 'error');
       if (commission != null && !isNaN(commission) && (commission < 0 || commission > 100)) return showToast('نسبة العمولة يجب أن تكون بين 0 و 100', 'error');
-      if (type === 'deposit' && commission == null && !confirm('الحركة دي "مدين" ومفيهاش نسبة عمولة، فمبلغها مش هيدخل في حساب "المدين (لنا)" في الملخص والـ Dashboard (الحساب بيتحسب بنسبة العمولة). تكمل من غير عمولة؟')) return;
+      if (type === 'deposit' && commission == null && !fixedShop && !confirm('الحركة دي "مدين" ومفيهاش نسبة عمولة، فمبلغها مش هيدخل في حساب "المدين (لنا)" في الملخص والـ Dashboard (الحساب بيتحسب بنسبة العمولة). تكمل من غير عمولة؟')) return;
 
       const btn = $('btnSaveShop'); btn.disabled = true;
       try {
         await addDoc(collection(db, "shop_balances"), {
-          entity, guideName, shopType, fileCode, period, type, amount, currency, commission, description, isDeleted: false, createdAt: new Date()
+          entity, guideName, shopType, fileCode, period, type, amount, currency, commission, description,
+          feeMode: fixedShop ? 'fixed' : null, quantity, unitAmount, isDeleted: false, createdAt: new Date()
         });
         showToast(t('msg_transaction_saved'), 'success');
         $('shopEntity').value = ''; $('shopGuideName').value = ''; $('shopShopType').value = ''; $('shopFileCode').value = ''; $('shopPeriod').selectedIndex = 0; $('shopAmount').value = ''; $('shopCommission').value = ''; $('shopDescription').value = '';
+        $('shopQuantity').value = ''; syncShopFeeMode(false);
       } catch (e) { showToast(e.message, 'error'); }
       finally { btn.disabled = false; }
     },
@@ -891,6 +919,11 @@
       $('editShopCurrency').value = item.currency || 'EGP';
       $('editShopCommission').value = (item.commission != null) ? item.commission : '';
       $('editShopDescription').value = item.description || '';
+      // العدد: من الحركة نفسها، أو (للحركات القديمة) المبلغ ÷ سعر الوحدة الحالي لو طلع عدد صحيح
+      const fx = getFixedFeeShop(item.entity);
+      let qty = item.quantity != null ? item.quantity : '';
+      if (qty === '' && fx && item.type === 'deposit') { const q = (parseFloat(item.amount) || 0) / parseFloat(fx.fixedUnitAmount); if (Number.isInteger(q) && q > 0) qty = q; }
+      $('editShopQuantity').value = qty;
       onEditShopTypeChange();
       $('editShopModal').style.display = 'flex';
     },
@@ -905,19 +938,30 @@
       const fileCode = $('editShopFileCode').value.trim();
       const period = $('editShopPeriod').value;
       const type = $('editShopType').value;
-      const amount = parseFloat($('editShopAmount').value);
-      const currency = $('editShopCurrency').value;
+      let amount = parseFloat($('editShopAmount').value);
+      let currency = $('editShopCurrency').value;
       const commissionRaw = $('editShopCommission').value;
       const commission = (type === 'deduction' || commissionRaw === '') ? null : parseFloat(commissionRaw);
       const description = $('editShopDescription').value.trim();
 
+      const fixedShop = type === 'deposit' ? getFixedFeeShop(entity) : null;
+      let quantity = null, unitAmount = null;
+      if (fixedShop) {
+        quantity = parseInt($('editShopQuantity').value);
+        if (!(quantity > 0)) return showToast('يرجى إدخال العدد', 'error');
+        unitAmount = parseFloat(fixedShop.fixedUnitAmount);
+        amount = quantity * unitAmount;
+        currency = fixedShop.fixedCurrency || currency;
+      }
+
       if (!entity || isNaN(amount) || amount <= 0) return showToast(t('msg_enter_shop_amount'), 'error');
       if (commission != null && !isNaN(commission) && (commission < 0 || commission > 100)) return showToast('نسبة العمولة يجب أن تكون بين 0 و 100', 'error');
-      if (type === 'deposit' && commission == null && !confirm('الحركة دي "مدين" ومفيهاش نسبة عمولة، فمبلغها مش هيدخل في حساب "المدين (لنا)" في الملخص والـ Dashboard (الحساب بيتحسب بنسبة العمولة). تكمل من غير عمولة؟')) return;
+      if (type === 'deposit' && commission == null && !fixedShop && !confirm('الحركة دي "مدين" ومفيهاش نسبة عمولة، فمبلغها مش هيدخل في حساب "المدين (لنا)" في الملخص والـ Dashboard (الحساب بيتحسب بنسبة العمولة). تكمل من غير عمولة؟')) return;
 
       try {
         await updateDoc(doc(db, "shop_balances", id), {
-          entity, guideName, shopType, fileCode, period, type, amount, currency, commission, description
+          entity, guideName, shopType, fileCode, period, type, amount, currency, commission, description,
+          feeMode: fixedShop ? 'fixed' : null, quantity, unitAmount
         });
         showToast(t('msg_edit_saved'), 'success');
         this.closeShopEditModal();
@@ -928,8 +972,9 @@
       if (this.currentShops.length === 0) return showToast(t('msg_no_data_export'), 'error');
       const data = this.currentShops.map((item, idx) => {
         const amountVal = parseFloat(item.amount) || 0;
-        const commissionPct = (item.commission != null && item.commission !== '') ? parseFloat(item.commission) : null;
-        const commissionAmount = commissionPct != null ? (amountVal * commissionPct / 100) : '';
+        const dInfo = this.getShopDebitInfo(item);
+        const commissionPct = dInfo.pct;
+        const commissionAmount = (dInfo.mode === 'credit' || dInfo.mode === 'none') ? '' : dInfo.commissionAmount;
         return {
           [t('col_idx')]: idx+1, [t('lbl_shop')]: item.entity, [t('lbl_guide_name')]: item.guideName || '',
           [t('lbl_shop_type')]: item.shopType || '',
@@ -937,7 +982,7 @@
           [t('lbl_period')]: item.period || item.month || '',
           [t('lbl_type')]: item.type === 'deposit' ? t('opt_debit_short') : t('opt_credit_short'),
           [t('lbl_amount')]: item.amount, [t('lbl_currency')]: item.currency,
-          [t('lbl_commission')]: commissionPct != null ? commissionPct + '%' : '',
+          [t('lbl_commission')]: dInfo.mode === 'fixed' ? ('مبلغ ثابت' + (item.quantity != null && item.unitAmount != null ? ' (' + item.quantity + ' × ' + item.unitAmount + ')' : '')) : (commissionPct != null ? commissionPct + '%' : ''),
           [t('lbl_commission_amount')]: commissionAmount,
           [t('lbl_status')]: item.type === 'deposit' ? t('status_under_collection') : t('status_collected'),
           [t('lbl_description')]: item.description
@@ -956,8 +1001,8 @@
         const amt = parseFloat(s.amount) || 0;
         const cur = (s.currency || 'EGP').toUpperCase();
         // إجمالي المدين = مبلغ العمولة المستحقة (المبلغ × نسبة العمولة) للحركات المدينة فقط
-        const commissionPct = (s.commission != null && s.commission !== '') ? parseFloat(s.commission) : null;
-        const commissionAmount = (s.type === 'deposit' && commissionPct != null) ? (amt * commissionPct / 100) : 0;
+        const dInfo = this.getShopDebitInfo(s);
+        const commissionAmount = dInfo.commissionAmount;
 
         if (s.type === 'deposit') byCurrencyDebit[cur] = (byCurrencyDebit[cur] || 0) + commissionAmount;
         else byCurrencyCredit[cur] = (byCurrencyCredit[cur] || 0) + amt;
@@ -966,7 +1011,7 @@
         if (!grouped[key]) grouped[key] = { entity: s.entity, currency: cur, debit: 0, credit: 0, noCommission: 0, noCommissionCount: 0 };
         if (s.type === 'deposit') grouped[key].debit += commissionAmount;
         else grouped[key].credit += amt;
-        if (s.type === 'deposit' && commissionPct == null) {
+        if (dInfo.mode === 'none') {
           grouped[key].noCommission += amt; grouped[key].noCommissionCount += 1;
           const w = noCommissionByCurrency[cur] || (noCommissionByCurrency[cur] = { amount: 0, count: 0 });
           w.amount += amt; w.count += 1;
@@ -1048,7 +1093,7 @@
               <td><strong>${escapeHTML(data.name)}</strong></td>
               <td>${escapeHTML(data.region || '-')}</td>
               <td>${escapeHTML(data.type || '-')}</td>
-              <td>${data.commissionRate != null ? data.commissionRate + '%' : '-'}</td>
+              <td>${parseFloat(data.fixedUnitAmount) > 0 ? `<span class="badge badge-deposit">${data.fixedUnitAmount} ${escapeHTML(data.fixedCurrency || 'USD')} / وحدة</span>` : (data.commissionRate != null ? data.commissionRate + '%' : '-')}</td>
               <td class="no-print">
                 <button class="edit-btn" onclick="App.openShopDirectoryEditModal('${docSnap.id}')">${t('btn_edit')}</button>
                 <button class="delete-btn" onclick="App.deleteShopDirectory('${docSnap.id}')">${t('btn_delete')}</button>
@@ -1098,19 +1143,24 @@
       const name = $('shopDirName').value.trim();
       const region = $('shopDirRegion').value;
       const type = $('shopDirType').value.trim();
-      const commissionRate = parseFloat($('shopDirCommission').value);
+      const feeFixed = $('shopDirFeeMode').value === 'fixed';
+      const fixedUnitAmount = feeFixed ? parseFloat($('shopDirFixedAmount').value) : NaN;
+      const fixedCurrency = feeFixed ? $('shopDirFixedCurrency').value : null;
+      const commissionRate = feeFixed ? NaN : parseFloat($('shopDirCommission').value);
 
       if (!name) return showToast(t('msg_enter_shop_name'), 'error');
+      if (feeFixed && !(fixedUnitAmount > 0)) return showToast('اكتب المبلغ الثابت للوحدة', 'error');
       if (!isNaN(commissionRate) && (commissionRate < 0 || commissionRate > 100)) return showToast('نسبة العمولة يجب أن تكون بين 0 و 100', 'error');
       if (this.isDuplicate(this.currentShopDirectory, 'name', name)) return showToast(t('msg_duplicate_shop'), 'error');
 
       const btn = $('btnSaveShopDirectory'); btn.disabled = true;
       try {
         await addDoc(collection(db, "shop_directory"), {
-          name, region, type, commissionRate: isNaN(commissionRate) ? null : commissionRate, isDeleted: false, createdAt: new Date()
+          name, region, type, commissionRate: isNaN(commissionRate) ? null : commissionRate,
+          fixedUnitAmount: feeFixed ? fixedUnitAmount : null, fixedCurrency, isDeleted: false, createdAt: new Date()
         });
         showToast(t('msg_shop_saved'), 'success');
-        $('shopDirName').value = ''; $('shopDirType').value = ''; $('shopDirCommission').value = '';
+        $('shopDirName').value = ''; $('shopDirType').value = ''; $('shopDirCommission').value = ''; $('shopDirFixedAmount').value = ''; $('shopDirFeeMode').value = 'percent'; toggleShopDirFeeMode('shopDir');
       } catch (e) { showToast(e.message, 'error'); }
       finally { btn.disabled = false; }
     },
@@ -1128,6 +1178,11 @@
       $('editShopDirRegion').value = item.region || 'الجيزة';
       $('editShopDirType').value = item.type || '';
       $('editShopDirCommission').value = (item.commissionRate != null) ? item.commissionRate : '';
+      const isFixed = parseFloat(item.fixedUnitAmount) > 0;
+      $('editShopDirFeeMode').value = isFixed ? 'fixed' : 'percent';
+      $('editShopDirFixedAmount').value = isFixed ? item.fixedUnitAmount : '';
+      $('editShopDirFixedCurrency').value = item.fixedCurrency || 'USD';
+      toggleShopDirFeeMode('editShopDir');
       $('editShopDirectoryModal').style.display = 'flex';
     },
 
@@ -1138,13 +1193,17 @@
       const name = $('editShopDirName').value.trim();
       const region = $('editShopDirRegion').value;
       const type = $('editShopDirType').value.trim();
-      const commissionRate = parseFloat($('editShopDirCommission').value);
+      const feeFixed = $('editShopDirFeeMode').value === 'fixed';
+      const fixedUnitAmount = feeFixed ? parseFloat($('editShopDirFixedAmount').value) : NaN;
+      const fixedCurrency = feeFixed ? $('editShopDirFixedCurrency').value : null;
+      const commissionRate = feeFixed ? NaN : parseFloat($('editShopDirCommission').value);
 
       if (!name) return showToast(t('msg_enter_shop_name'), 'error');
+      if (feeFixed && !(fixedUnitAmount > 0)) return showToast('اكتب المبلغ الثابت للوحدة', 'error');
       if (!isNaN(commissionRate) && (commissionRate < 0 || commissionRate > 100)) return showToast('نسبة العمولة يجب أن تكون بين 0 و 100', 'error');
       if (this.isDuplicate(this.currentShopDirectory, 'name', name, id)) return showToast(t('msg_duplicate_shop'), 'error');
       try {
-        await updateDoc(doc(db, "shop_directory", id), { name, region, type, commissionRate: isNaN(commissionRate) ? null : commissionRate });
+        await updateDoc(doc(db, "shop_directory", id), { name, region, type, commissionRate: isNaN(commissionRate) ? null : commissionRate, fixedUnitAmount: feeFixed ? fixedUnitAmount : null, fixedCurrency });
         showToast(t('msg_edit_saved'), 'success');
         this.closeShopDirectoryEditModal();
       } catch (e) { showToast(e.message, 'error'); }
@@ -1154,7 +1213,7 @@
       if (this.currentShopDirectory.length === 0) return showToast(t('msg_no_data_export'), 'error');
       const data = this.currentShopDirectory.map((item, idx) => ({
         [t('col_idx')]: idx+1, [t('lbl_shop_name')]: item.name, [t('lbl_region')]: item.region || '',
-        [t('lbl_shop_type')]: item.type || '', [t('lbl_commission')]: item.commissionRate != null ? item.commissionRate + '%' : ''
+        [t('lbl_shop_type')]: item.type || '', [t('lbl_commission')]: parseFloat(item.fixedUnitAmount) > 0 ? (item.fixedUnitAmount + ' ' + (item.fixedCurrency || 'USD') + ' / وحدة') : (item.commissionRate != null ? item.commissionRate + '%' : '')
       }));
       const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, t('sheet_shop_directory')); XLSX.writeFile(wb, "Shop_Directory.xlsx");

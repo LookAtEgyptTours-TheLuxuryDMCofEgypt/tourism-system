@@ -799,6 +799,7 @@
     const input = document.getElementById('editShopEntity');
     const dropdown = document.getElementById('editShopEntitySuggestions');
     if (!input || !dropdown) return;
+    syncShopFeeMode(true);
     const q = normalizeSearchText(input.value);
     if (!q || !window.App) { dropdown.style.display = 'none'; return; }
 
@@ -824,6 +825,7 @@
   function selectEditShopEntitySuggestion(name) {
     document.getElementById('editShopEntity').value = name;
     document.getElementById('editShopEntitySuggestions').style.display = 'none';
+    syncShopFeeMode(true);
 
     const target = (name || '').trim().toLowerCase();
     const shop = (window.App && window.App.currentShopDirectory || []).find(s => (s.name || '').trim().toLowerCase() === target);
@@ -911,9 +913,63 @@
         .find(s => (s.name || '').trim().toLowerCase() === target);
       commissionInput.value = (shop && shop.commissionRate != null) ? shop.commissionRate : commissionInput.value;
     }
+    syncShopFeeMode(false);
   }
 
   // نفس منطق onShopTypeChange لكن لحقول مودال تعديل حركة المحل
+  // ===== محلات بمبلغ ثابت للوحدة (بدل نسبة العمولة): الإجمالي = العدد × المبلغ الثابت =====
+  function normalizeShopKey(name) {
+    return normalizeSearchText(name).replace(/[\s()]/g, '');
+  }
+  function getFixedFeeShop(name) {
+    const key = normalizeShopKey(name);
+    if (!key || !window.App) return null;
+    return (window.App.currentShopDirectory || []).find(s => !s.isDeleted && parseFloat(s.fixedUnitAmount) > 0 && normalizeShopKey(s.name) === key) || null;
+  }
+
+  // بيقفل خانة العمولة ويظهر خانة "العدد" ويثبّت المبلغ والعملة لو المحل بمبلغ ثابت والحركة "مدين"
+  function syncShopFeeMode(isEdit) {
+    const p = isEdit ? 'editShop' : 'shop';
+    const el = (s) => document.getElementById(p + s);
+    const entity = el('Entity'), type = el('Type'), amount = el('Amount'), currency = el('Currency'), commission = el('Commission');
+    const qtyWrap = el('QuantityWrap'), qty = el('Quantity');
+    if (!entity || !type || !amount || !currency || !commission || !qtyWrap) return;
+
+    const shop = type.value === 'deposit' ? getFixedFeeShop(entity.value) : null;
+    if (shop) {
+      qtyWrap.style.display = 'block';
+      amount.value = shop.fixedUnitAmount; amount.readOnly = true; amount.dataset.fixedFill = '1';
+      currency.value = shop.fixedCurrency || 'USD'; currency.disabled = true;
+      commission.value = ''; commission.disabled = true;
+      updateShopFixedHint(isEdit);
+    } else {
+      qtyWrap.style.display = 'none';
+      if (amount.dataset.fixedFill) { amount.value = ''; delete amount.dataset.fixedFill; }
+      amount.readOnly = false; currency.disabled = false;
+      commission.disabled = (type.value === 'deduction');
+      const hint = el('FixedHint'); if (hint) hint.textContent = '';
+    }
+  }
+
+  function updateShopFixedHint(isEdit) {
+    const p = isEdit ? 'editShop' : 'shop';
+    const hint = document.getElementById(p + 'FixedHint');
+    const shop = getFixedFeeShop(document.getElementById(p + 'Entity').value);
+    if (!hint || !shop) return;
+    const q = parseInt(document.getElementById(p + 'Quantity').value);
+    const unit = parseFloat(shop.fixedUnitAmount), cur = shop.fixedCurrency || 'USD';
+    hint.textContent = q > 0 ? `الإجمالي: ${q} × ${unit} = ${(q * unit).toLocaleString(undefined, {maximumFractionDigits: 2})} ${cur}` : `سعر الوحدة ${unit} ${cur} — اكتب العدد`;
+  }
+
+  // دليل المحلات: التبديل بين "نسبة %" و"مبلغ ثابت للوحدة"
+  function toggleShopDirFeeMode(prefix) {
+    const fixed = document.getElementById(prefix + 'FeeMode').value === 'fixed';
+    const comm = document.getElementById(prefix + 'CommissionWrap');
+    comm.style.display = fixed ? 'none' : (comm.dataset.show || '');
+    document.getElementById(prefix + 'FixedWrap').style.display = fixed ? 'block' : 'none';
+    if (fixed) document.getElementById(prefix + 'Commission').value = '';
+  }
+
   function onEditShopTypeChange() {
     const typeSelect = document.getElementById('editShopType');
     const commissionInput = document.getElementById('editShopCommission');
@@ -925,6 +981,7 @@
     } else {
       commissionInput.disabled = false;
     }
+    syncShopFeeMode(true);
   }
 
   function renderRunningStatement() {
