@@ -2130,7 +2130,7 @@ exportTicketsBalance() {
                 <td><strong>${escapeHTML(data.fileCode || '-')}</strong></td>
                 <td>${escapeHTML(getMonthNameFromFileCode(data.fileCode) || '-')}</td>
                 <td>${escapeHTML(data.guideName || '-')}</td>
-                <td>${escapeHTML(data.fileName || '-')}</td>
+                <td>${escapeHTML(getSettlementFileName(data) || '-')}</td>
                 <td>${data.paxCount != null ? data.paxCount : '-'}</td>
                 <td>${data.fileType === 'opt' ? 'OPT' : 'عادي'}</td>
                 <td>${calcs.revenue.toLocaleString()}</td>
@@ -2604,7 +2604,7 @@ exportTicketsBalance() {
       const data = archived.map((item, idx) => {
         const calcs = this.calculateSettlementValues(item.revenue, item.expenses, item.exchangeRate, item.fileType);
         return {
-          "م": idx + 1, "كود الملف": item.fileCode, "الشهر": getMonthNameFromFileCode(item.fileCode), "اسم الأوبريتور": item.guideName, "اسم الملف": (item.fileName || ''), "عدد الأفراد": (item.paxCount != null ? item.paxCount : ''),
+          "م": idx + 1, "كود الملف": item.fileCode, "الشهر": getMonthNameFromFileCode(item.fileCode), "اسم الأوبريتور": item.guideName, "اسم الملف": getSettlementFileName(item), "عدد الأفراد": (item.paxCount != null ? item.paxCount : ''),
           "نوع الملف": (item.fileType === 'opt' ? 'OPT' : 'عادي'),
           "الإيرادات": calcs.revenue, "المصروفات": calcs.expenses, "الربح": calcs.profit,
           "الصافي بعد الضريبة": calcs.netAfterTax, "نسبة العمولة": calcs.commissionRatePercent + '%', "مبلغ العمولة": calcs.commissionAmount,
