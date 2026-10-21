@@ -1822,15 +1822,27 @@
           });
         }
         showToast('تم حفظ التذاكر بنجاح', 'success');
-        if (action === 'صرف') this.printTicketReceipt({ fileCode, guideName, notes, rows: validRows });
+        if (action === 'صرف') this.printTicketReceipt({ fileCode, guideName, notes, rows: validRows, issuedAt: new Date() });
         this.resetTicketForm();
       } catch (e) { showToast(e.message, 'error'); } 
       finally { btn.disabled = false; }
     },
 
     // بناء إيصال صرف تذاكر وطباعته فورًا، مع سطر توقيع للشخص المستلم
-    printTicketReceipt({ fileCode, guideName, notes, rows }) {
-      const todayStr = new Date().toLocaleDateString('en-GB');
+    // بنطبع من iframe مخفي جوه نفس الصفحة (مش نافذة منبثقة) عشان حاجب النوافذ المنبثقة ومشاكل التوقيت ما تعطّلش الطباعة
+    printTicketReceipt(data) {
+      this.lastTicketReceipt = data;
+      const btn = $('btnReprintReceipt'); if (btn) btn.style.display = 'inline-block';
+      this.printHtmlInFrame(this.buildTicketReceiptHtml(data));
+    },
+
+    reprintLastTicketReceipt() {
+      if (!this.lastTicketReceipt) return showToast('مفيش إيصال سابق لإعادة طباعته', 'error');
+      this.printHtmlInFrame(this.buildTicketReceiptHtml(this.lastTicketReceipt));
+    },
+
+    buildTicketReceiptHtml({ fileCode, guideName, notes, rows, issuedAt }) {
+      const todayStr = (issuedAt ? new Date(issuedAt) : new Date()).toLocaleDateString('en-GB');
       const rowsHtml = rows.map((r, i) => `
         <tr>
           <td>${i + 1}</td>
@@ -1847,6 +1859,7 @@
           <meta charset="UTF-8">
           <title>إيصال صرف تذاكر</title>
           <style>
+            @page { size: A4; margin: 12mm; }
             body { font-family: Arial, Tahoma, sans-serif; padding: 30px; color: #111; }
             .report-header { text-align: center; margin-bottom: 25px; }
             .report-header h2 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
@@ -1886,16 +1899,33 @@
         </body>
         </html>
       `;
+      return receiptHtml;
+    },
 
-      const printWindow = window.open('', '_blank', 'width=800,height=900');
-      if (!printWindow) { showToast('يرجى السماح بالنوافذ المنبثقة (Popups) لطباعة الإيصال', 'error'); return; }
-      printWindow.document.open();
-      printWindow.document.write(receiptHtml);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        printWindow.focus();
-        printWindow.print();
+    printHtmlInFrame(html) {
+      const old = document.getElementById('printFrame'); if (old) old.remove();
+      const iframe = document.createElement('iframe');
+      iframe.id = 'printFrame';
+      iframe.setAttribute('aria-hidden', 'true');
+      // مش display:none عشان بعض المتصفحات بتطبع صفحة فاضية لو الإطار مخفي، فبنخليه برا الشاشة بحجم حقيقي
+      iframe.style.cssText = 'position:fixed; left:-10000px; top:0; width:800px; height:1000px; border:0; opacity:0; pointer-events:none;';
+      document.body.appendChild(iframe);
+
+      const win = iframe.contentWindow;
+      const frameDoc = win.document;
+      frameDoc.open(); frameDoc.write(html); frameDoc.close();
+
+      const cleanup = () => { setTimeout(() => iframe.remove(), 500); };
+      win.addEventListener('afterprint', cleanup);
+      setTimeout(cleanup, 120000); // احتياطي لو afterprint ماجاش
+
+      const doPrint = () => {
+        try { win.focus(); win.print(); }
+        catch (e) { showToast('تعذر فتح شاشة الطباعة، اضغط "إعادة طباعة آخر إيصال"', 'error'); }
       };
+      // بنستنى الخطوط/التخطيط يخلصوا قبل ما نفتح شاشة الطباعة (عشان ما تظهرش فاضية)
+      const fontsReady = (frameDoc.fonts && frameDoc.fonts.ready) ? frameDoc.fonts.ready : Promise.resolve();
+      fontsReady.then(() => setTimeout(doPrint, 250));
     },
 
     // يطابق اسم مزار جاي من ملف إكسيل مع القائمة الثابتة، بمطابقة تامة أولاً وبعدين مطابقة جزئية (احتواء) كحل احتياطي
