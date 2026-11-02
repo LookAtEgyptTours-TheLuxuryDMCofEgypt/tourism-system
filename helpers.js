@@ -518,8 +518,8 @@
 
   // ===== بحث تصفيات الأوبريتور (نافذة البحث: اسم الأوبريتور + الشهر) =====
   const settlementSearchState = {
-    list:    { operator: '', month: '' },
-    archive: { operator: '', month: '' }
+    list:    { operator: '', month: '', fileCode: '' },
+    archive: { operator: '', month: '', fileCode: '' }
   };
   let settlementSearchMode = 'list';
 
@@ -542,8 +542,10 @@
     monthSel.innerHTML = '<option value="">الكل</option>' +
       ARABIC_MONTH_NAMES.map(m => `<option value="${m}">${m}</option>`).join('');
     monthSel.value = st.month || '';
+    document.getElementById('settlementSearchFileCode').value = st.fileCode || '';
 
     document.getElementById('settlementSearchModal').style.display = 'flex';
+    setTimeout(() => { const f = document.getElementById('settlementSearchFileCode'); if (f) f.focus(); }, 50);
   }
 
   function closeSettlementSearchModal() {
@@ -553,15 +555,21 @@
   function applySettlementSearch() {
     settlementSearchState[settlementSearchMode] = {
       operator: document.getElementById('settlementSearchOperator').value,
-      month: document.getElementById('settlementSearchMonth').value
+      month: document.getElementById('settlementSearchMonth').value,
+      fileCode: document.getElementById('settlementSearchFileCode').value.trim()
     };
     closeSettlementSearchModal();
     applySettlementFilter(settlementSearchMode);
   }
 
   function clearSettlementSearch(mode) {
-    settlementSearchState[mode] = { operator: '', month: '' };
+    settlementSearchState[mode] = { operator: '', month: '', fileCode: '' };
     applySettlementFilter(mode);
+  }
+
+  // توحيد رقم الملف للبحث: أرقام عربية -> إنجليزي، وتجاهل المسافات والحروف الكبيرة/الصغيرة
+  function normalizeFileCodeSearch(str) {
+    return String(str || '').replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/\s+/g, '').toLowerCase();
   }
 
   function applySettlementFilter(mode) {
@@ -569,10 +577,11 @@
     const st = settlementSearchState[mode];
     const selectedOperator = (st.operator || '').toLowerCase().trim();
     const selectedMonth = normalizeSearchText(st.month);
+    const selectedFileCode = normalizeFileCodeSearch(st.fileCode);
 
     const printElem = document.getElementById(isArchive ? 'archiveSettlementPrintFilter' : 'settlementPrintFilter');
     if (printElem) {
-      printElem.innerText = [st.operator || 'جميع الأوبريتورز', st.month ? 'شهر ' + st.month : ''].filter(Boolean).join(' — ');
+      printElem.innerText = [st.operator || 'جميع الأوبريتورز', st.month ? 'شهر ' + st.month : '', st.fileCode ? 'ملف ' + st.fileCode : ''].filter(Boolean).join(' — ');
     }
 
     // شارة توضح الفلتر الشغال + زر مسح
@@ -581,6 +590,7 @@
       const parts = [];
       if (st.operator) parts.push('الأوبريتور: ' + escapeHTML(st.operator));
       if (st.month) parts.push('الشهر: ' + escapeHTML(st.month));
+      if (st.fileCode) parts.push('الملف: ' + escapeHTML(st.fileCode));
       chip.innerHTML = parts.length ? `<span>${parts.join(' • ')}</span><button type="button" title="مسح البحث" onclick="clearSettlementSearch('${mode}')">✖</button>` : '';
       chip.style.display = parts.length ? 'inline-flex' : 'none';
     }
@@ -592,7 +602,8 @@
       const rowMonth = normalizeSearchText(tr.getAttribute('data-month') || '');
       const operatorMatch = !selectedOperator || guideName === selectedOperator;
       const monthMatch = !selectedMonth || rowMonth === selectedMonth;
-      tr.style.display = (operatorMatch && monthMatch) ? '' : 'none';
+      const fileCodeMatch = !selectedFileCode || normalizeFileCodeSearch(tr.getAttribute('data-filecode') || '').includes(selectedFileCode);
+      tr.style.display = (operatorMatch && monthMatch && fileCodeMatch) ? '' : 'none';
     });
 
     if (window.App) {
@@ -1055,122 +1066,4 @@
     return str.replace(/[&<>'"]/g, 
       tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
     );
-  }
-
-  // ===== أسماء الملفات حسب كود الملف (للتصفيات القديمة اللي اسم الملف فيها فاضي) =====
-  // لو التصفية نفسها فيها اسم ملف محفوظ بيتعرض هو، ولو فاضي بنرجع لهذه القائمة.
-  const SETTLEMENT_FILE_NAMES = {
-    "202511/20": "Michel Premont",
-    "202511/14": "Karen Collishaw",
-    "202511/31": "Travelphoer",
-    "202511/32": "Selma Budak",
-    "202511/21": "Kulbinder Kaur Hari",
-    "202511/1": "Rance Wall",
-    "202512/2": "Nadine Baladi",
-    "202512/3": "Etienne Audet",
-    "202512/8": "Troy Gua",
-    "202512/18": "Van Der",
-    "202512/22": "True Blue Tour",
-    "202512/23": "The Greatest Travel",
-    "202512/24": "Morjan Luja",
-    "202512/12": "Thai Group",
-    "202512/38": "Lucien Callige's Family",
-    "202512/42": "Cheung Tsz Yat",
-    "202512/14": "Tahlia",
-    "202512/6": "Alexandria & Thisen",
-    "202511/46": "Clemence",
-    "202511/22": "Hollie Oswald",
-    "202511/9": "Massimiliano Scudeletti",
-    "202511/17": "Rene",
-    "202511/5": "Mary Forbes",
-    "202511/19": "Christopher",
-    "202602/32": "around of the world - KOUFOGAZOS/",
-    "202602/19": "SONA",
-    "202603/19": "Kelly Moody",
-    "202603/13": "Alok",
-    "202603/21": "Sylvie Arkoun",
-    "202602/5": "Tour4U",
-    "202602/16": "DeWonder FIT",
-    "202602/8": "DeWonder Travel",
-    "202602/22": "Wong Man Ian",
-    "202602/24": "Sung",
-    "202602/28": "Fiona and Antonio",
-    "202602/13": "Larry James",
-    "202601/10": "NOI ORATORIO SACRI CUORI DI GESÙ E MARIA – APS",
-    "202601/6": "Plenustour Japan",
-    "202601/7": "Robert",
-    "202601/28": "Jatinder Singh",
-    "202602/14": "Suraj",
-    "202601/25": "Marco's Family",
-    "202601/15": "Pamela",
-    "202512/1": "Bonnie Hewitt",
-    "202512/13": "Paula",
-    "202512/9": "Natalie Odzer",
-    "202512/26": "Syed",
-    "202512/28": "Hazel H",
-    "202511/18": "Patrick Barnes",
-    "202511/6": "IHPL",
-    "202511/2": "Lalitha Narayanan",
-    "202511/3": "Isaac Singh",
-    "202511/45": "Moses Ong",
-    "202511/15": "Eyup Karaman",
-    "202511/4": "Haniff Sabar",
-    "202511/35": "Bert Cornelissen",
-    "202606/2": "Julie Berris",
-    "202605/15": "Montserrat Blanch",
-    "202604/26": "Robert Tyler Trent",
-    "202603/32": "Shelby",
-    "202603/1": "Kurt Reynolds",
-    "202512/61": "Steven Xu",
-    "202512/45": "Maisah Howard",
-    "202512/40": "Mr. Milind",
-    "202512/35": "Breogan Alvarez",
-    "202512/31": "Swendri Weeraratne",
-    "202512/16": "Priscilla Vythilingum",
-    "202512/15": "Do Afrika",
-    "202512/7": "CHARLES SCHREYER",
-    "202512/5": "Faisal Qureshi",
-    "202512/4": "amber brunck",
-    "202604/21": "Chow",
-    "202604/20": "Meltem's Group GEM+Bahariye+Alexandria",
-    "202604/12": "Malcuit",
-    "202604/7": "Meltem's Group \"A\"",
-    "202604/5": "Meltem's Group \"B\"",
-    "202604/4": "Armin Kabir",
-    "202603/37": "D wonder 2",
-    "202603/25": "Mark Wood",
-    "202603/2": "Mayra Boitel",
-    "202603/26": "Murphy",
-    "202603/29": "D wonder 1",
-    "202603/22": "Peter Valentin",
-    "202605/13": "Harry schulz",
-    "202605/10": "Ravi Rekha",
-    "202604/24": "Blossom Travel",
-    "202604/22": "Blossom Travel",
-    "202604/10": "Joseph Laur",
-    "202604/3": "Eugene Tarasula",
-    "202603/33": "steffani Fescher",
-    "202603/9": "Linda Guo",
-    "202604/17": "D wonder 3",
-    "202601/3": "Peter Cubra",
-    "202601/13": "Sarah Mayer",
-    "202601/26": "Patrick Garnier",
-    "202606/11": "Stan Dong",
-    "202607/6": "Jadok Travel",
-    "202607/8": "KONTA MAYUMI & KURIHARA NANAMMI"
-  };
-
-  // بتبدّل الأرقام العربية بإنجليزي وتشيل المسافات وتوحّد الفاصل (\\ - . تتحول لـ /) عشان المطابقة متتأثرش بشكل الكتابة
-  function normalizeFileCodeKey(fileCode) {
-    return String(fileCode || '').trim()
-      .replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))
-      .replace(/\s+/g, '')
-      .replace(/[\\\-.]/g, '/');
-  }
-
-  // اسم الملف المعروض للتصفية: المحفوظ في السجل أولًا، وإلا من القائمة حسب كود الملف
-  function getSettlementFileName(record) {
-    const saved = String((record && record.fileName) || '').trim();
-    if (saved) return saved;
-    return SETTLEMENT_FILE_NAMES[normalizeFileCodeKey(record && record.fileCode)] || '';
   }

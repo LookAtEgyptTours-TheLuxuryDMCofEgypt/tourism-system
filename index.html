@@ -11,7 +11,7 @@
   <!-- مكتبة الرسوم البيانية (صفحة تحليل البيانات) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   
-  <link rel="stylesheet" href="style.css?v=20261026a">
+  <link rel="stylesheet" href="style.css?v=20261026b">
 </head>
 <body>
 
@@ -1394,7 +1394,7 @@
 </div>
 
 <!-- Modal بحث تصفيات الأوبريتور (سجل التصفيات / الأرشيف) -->
-<div id="settlementSearchModal" class="modal-overlay search-modal" onclick="if(event.target===this)closeSettlementSearchModal()" onkeydown="if(event.key==='Enter'){event.preventDefault();applySettlementSearch();}">
+<div id="settlementSearchModal" class="modal-overlay search-modal search-modal-wide" onclick="if(event.target===this)closeSettlementSearchModal()" onkeydown="if(event.key==='Enter'){event.preventDefault();applySettlementSearch();}">
   <div class="modal-content">
     <div class="search-modal-header">
       <h3>بحث</h3>
@@ -1409,6 +1409,10 @@
         <div class="form-group">
           <label>الشهر</label>
           <select id="settlementSearchMonth"><option value="">الكل</option></select>
+        </div>
+        <div class="form-group">
+          <label>رقم الملف</label>
+          <input type="text" id="settlementSearchFileCode" placeholder="مثال: 202609/1" autocomplete="off">
         </div>
       </div>
     </div>
@@ -1533,12 +1537,12 @@
 </div>
 
 <!-- ================= LANGUAGE / TRANSLATION SYSTEM ================= -->
-<script src="i18n.js?v=20261026a"></script>
+<script src="i18n.js?v=20261026b"></script>
 
 <!-- ================= NAVIGATION & GLOBAL JS ================= -->
-<script src="helpers.js?v=20261026a"></script>
+<script src="helpers.js?v=20261026b"></script>
 
 <!-- ================= JAVASCRIPT LOGIC ================= -->
-<script type="module" src="app.js?v=20261026a"></script>
+<script type="module" src="app.js?v=20261026b"></script>
 </body>
 </html>
