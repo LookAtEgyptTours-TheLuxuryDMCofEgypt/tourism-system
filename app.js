@@ -1542,21 +1542,30 @@
           return;
         }
 
-        let idx = 1;
-        let htmlBuffer = '';
         snapshot.forEach(docSnap => {
           const data = docSnap.data(); data.id = docSnap.id;
           if (data.isDeleted) return;
           this.currentTickets.push(data);
+        });
+        const stock = this.computeTicketStock().byRecord;
 
+        let idx = 1;
+        let htmlBuffer = '';
+        this.currentTickets.forEach(data => {
           const dateStr = data.createdAt ? new Date(data.createdAt.seconds * 1000).toLocaleDateString('en-GB') : '-';
           const actionBadge = data.action === 'صرف' ? '<span class="badge badge-deduction">صرف</span>' : '<span class="badge badge-deposit">إضافة</span>';
 
+          // تاريخ الصلاحية: بيتلوّن أحمر بس لو الدفعة منتهية وفيها تذاكر لسه ماتصرفتش (المصروف بالكامل ما بيتحسبش منتهي)
           let expiryStr = '-';
           if (data.expiryDate) {
             const expiryDateObj = new Date(data.expiryDate);
-            const isExpired = expiryDateObj < new Date(new Date().toDateString());
-            expiryStr = `<span style="${isExpired ? 'color:#dc2626; font-weight:700;' : ''}">${expiryDateObj.toLocaleDateString('en-GB')}</span>`;
+            const dateText = expiryDateObj.toLocaleDateString('en-GB');
+            const st = data.action === 'صرف' ? null : stock[data.id];
+            if (!st) expiryStr = `<span>${dateText}</span>`;
+            else if (st.expired && st.remaining > 0) expiryStr = `<span style="color:#dc2626; font-weight:700;">${dateText}</span> <small style="color:#dc2626;">(منتهية — متبقي ${st.remaining})</small>`;
+            else if (st.expired) expiryStr = `<span style="color:#64748b;">${dateText}</span> <small style="color:#16a34a;">✓ مصروفة بالكامل</small>`;
+            else if (st.remaining < (parseFloat(data.qty) || 0)) expiryStr = `<span>${dateText}</span> <small style="color:#64748b;">(متبقي ${st.remaining})</small>`;
+            else expiryStr = `<span>${dateText}</span>`;
           }
 
           htmlBuffer += `
@@ -1571,8 +1580,8 @@
               <td>${escapeHTML(data.notes || '-')}</td>
               <td>${dateStr}</td>
               <td class="no-print">
-                <button class="edit-btn" onclick="App.openTicketEditModal('${docSnap.id}')">تعديل</button>
-                <button class="delete-btn" onclick="App.deleteTicket('${docSnap.id}')">حذف</button>
+                <button class="edit-btn" onclick="App.openTicketEditModal('${data.id}')">تعديل</button>
+                <button class="delete-btn" onclick="App.deleteTicket('${data.id}')">حذف</button>
               </td>
             </tr>
           `;
@@ -2037,27 +2046,45 @@
       XLSX.utils.book_append_sheet(wb, ws, "التذاكر"); XLSX.writeFile(wb, "Tickets_List.xlsx");
     },
 
+    // حساب مخزون التذاكر بطريقة "الصرف بيتخصم من أقرب صلاحية الأول" (FIFO بتاريخ الانتهاء):
+    //  - كل حركة "وارد" بتتعامل كدفعة ليها تاريخ صلاحية، والتذاكر المصروفة بتخلّص الدفعات من الأقرب انتهاءً للأبعد (من غير تاريخ = آخر حاجة)
+    //  - "المنتهي" = اللي فضل من دفعات صلاحيتها عدّت ولسه ماتصرفش (مش كل كمية الدفعة)
+    //  - byName: الإجماليات لكل مزار، byRecord: المتبقي من كل دفعة وارد
+    computeTicketStock() {
+      const todayStart = new Date(new Date().toDateString());
+      const byName = {}, byRecord = {};
+      const groups = {};
+      (this.currentTickets || []).forEach(t => {
+        const name = (t.ticketName || '').trim() || 'غير محدد';
+        (groups[name] = groups[name] || { incoming: [], issued: 0 });
+        const qty = parseFloat(t.qty) || 0;
+        if (t.action === 'صرف') groups[name].issued += qty; else groups[name].incoming.push({ rec: t, qty });
+      });
+
+      Object.entries(groups).forEach(([name, g]) => {
+        const seconds = (r) => (r.createdAt && r.createdAt.seconds) || 0;
+        const expMs = (r) => r.expiryDate ? new Date(r.expiryDate).getTime() : Infinity;
+        const batches = g.incoming.slice().sort((x, y) => (expMs(x.rec) - expMs(y.rec)) || (seconds(x.rec) - seconds(y.rec)));
+        let toIssue = g.issued, added = 0, expired = 0;
+        batches.forEach(b => {
+          const take = Math.min(b.qty, Math.max(toIssue, 0));
+          toIssue -= take;
+          const remaining = b.qty - take;
+          const isExpired = !!b.rec.expiryDate && new Date(b.rec.expiryDate) < todayStart;
+          added += b.qty;
+          if (isExpired) expired += remaining;
+          if (b.rec.id) byRecord[b.rec.id] = { remaining, issued: take, expired: isExpired };
+        });
+        byName[name] = { added, deducted: g.issued, expired, balance: added - g.issued - expired };
+      });
+      return { byName, byRecord };
+    },
+
     updateTicketsBalance() {
       const tbody = $('ticketsBalanceTableBody');
       if (!tbody) return;
 
-      const today = new Date(new Date().toDateString());
-      const grouped = {};
-      this.currentTickets.forEach(t => {
-        const name = (t.ticketName || '').trim() || 'بدون اسم مزار';
-        if (!grouped[name]) grouped[name] = { added: 0, deducted: 0, expired: 0 };
-        const qty = parseFloat(t.qty) || 0;
-        if (t.action === 'صرف') {
-          grouped[name].deducted += qty;
-        } else {
-          grouped[name].added += qty;
-          // نحسب الكمية منتهية الصلاحية من دفعات الإضافة اللي فات تاريخ صلاحيتها فقط
-          if (t.expiryDate) {
-            const expiryDateObj = new Date(t.expiryDate);
-            if (expiryDateObj < today) grouped[name].expired += qty;
-          }
-        }
-      });
+      const grouped = this.computeTicketStock().byName;
 
       const names = Object.keys(grouped).sort((a, b) => a.localeCompare(b, 'ar'));
       if (names.length === 0) {
@@ -2663,24 +2690,9 @@ exportTicketsBalance() {
       if ($('mDashTotalAviation')) $('mDashTotalAviation').innerText = totalAviation.toLocaleString();
 
       // إجمالي عدد التذاكر الفعلية (الرصيد المتبقي الصالح لكل المزارات مجمّعة) = الإضافة - الصرف - المنتهي الصلاحية
-      const todayStart = new Date(new Date().toDateString());
-      const ticketGroups = {};
-      this.currentTickets.forEach(t => {
-        const name = (t.ticketName || '').trim() || 'بدون اسم مزار';
-        if (!ticketGroups[name]) ticketGroups[name] = { added: 0, deducted: 0, expired: 0 };
-        const qty = parseFloat(t.qty) || 0;
-        if (t.action === 'صرف') {
-          ticketGroups[name].deducted += qty;
-        } else {
-          ticketGroups[name].added += qty;
-          if (t.expiryDate) {
-            const expiryDateObj = new Date(t.expiryDate);
-            if (expiryDateObj < todayStart) ticketGroups[name].expired += qty;
-          }
-        }
-      });
+      const ticketStock = this.computeTicketStock().byName;
       let totalTickets = 0;
-      Object.values(ticketGroups).forEach(g => { totalTickets += (g.added - g.deducted - g.expired); });
+      Object.values(ticketStock).forEach(g => { totalTickets += g.balance; });
       if ($('mDashTotalTickets')) $('mDashTotalTickets').innerText = totalTickets.toLocaleString();
 
       let totalCommissions = 0;
