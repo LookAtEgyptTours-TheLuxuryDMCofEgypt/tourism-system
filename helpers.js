@@ -416,7 +416,7 @@
       const guideText = (tr.children[4] ? tr.children[4].innerText : "").toLowerCase();
 
       const matchesGuide = !guideFilter || guideText.includes(guideFilter);
-      const matchesFileCode = !fileCodeFilter || fileCodeText.includes(fileCodeFilter);
+      const matchesFileCode = fileCodeMatches(fileCodeText, fileCodeFilter);
       const matchesLandmark = !landmarkFilter || landmarkText.includes(landmarkFilter);
 
       tr.style.display = (matchesGuide && matchesFileCode && matchesLandmark) ? "" : "none";
@@ -567,6 +567,17 @@
     applySettlementFilter(mode);
   }
 
+  // مطابقة رقم الملف في البحث: لو المكتوب رقم ملف كامل (سنة+شهر/رقم، مثل 202611/2) بنجيب الملف ده بالظبط
+  // (من غير 202611/20 و202611/21)، ولو المكتوب جزء منه (مثل 202611 أو /2) بنجيب كل اللي فيه الجزء ده
+  function fileCodeMatches(codeText, query) {
+    const q = normalizeFileCodeSearch(query);
+    if (!q) return true;
+    const sep = (s) => s.replace(/[\\\-.]/g, '/');
+    const c = sep(normalizeFileCodeSearch(codeText));
+    const qs = sep(q);
+    return /^\d{6}\/\d+$/.test(qs) ? c === qs : c.includes(qs);
+  }
+
   // توحيد رقم الملف للبحث: أرقام عربية -> إنجليزي، وتجاهل المسافات والحروف الكبيرة/الصغيرة
   function normalizeFileCodeSearch(str) {
     return String(str || '').replace(/[\u0660-\u0669]/g, d => String(d.charCodeAt(0) - 0x0660)).replace(/\s+/g, '').toLowerCase();
@@ -602,7 +613,7 @@
       const rowMonth = normalizeSearchText(tr.getAttribute('data-month') || '');
       const operatorMatch = !selectedOperator || guideName === selectedOperator;
       const monthMatch = !selectedMonth || rowMonth === selectedMonth;
-      const fileCodeMatch = !selectedFileCode || normalizeFileCodeSearch(tr.getAttribute('data-filecode') || '').includes(selectedFileCode);
+      const fileCodeMatch = fileCodeMatches(tr.getAttribute('data-filecode') || '', st.fileCode);
       tr.style.display = (operatorMatch && monthMatch && fileCodeMatch) ? '' : 'none';
     });
 
