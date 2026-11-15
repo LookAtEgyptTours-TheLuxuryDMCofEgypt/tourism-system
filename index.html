@@ -11,7 +11,7 @@
   <!-- مكتبة الرسوم البيانية (صفحة تحليل البيانات) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   
-  <link rel="stylesheet" href="style.css?v=20261026d">
+  <link rel="stylesheet" href="style.css?v=20261026e">
 </head>
 <body>
 
@@ -1293,6 +1293,41 @@
   </div>
 </div>
 
+<!-- Modal تعديل حركة كريديت -->
+<div id="editCreditModal" class="modal-overlay">
+  <div class="modal-content">
+    <h3>تعديل حركة الكريديت</h3>
+    <input type="hidden" id="editCreditId">
+    <div class="form-row">
+      <div class="form-group" style="position:relative;">
+        <label>الفندق / الجهة</label>
+        <input type="text" id="editCreditEntity" autocomplete="off" oninput="searchEditCreditEntitySuggestions()" onfocus="searchEditCreditEntitySuggestions()">
+        <div id="editCreditEntitySuggestions" class="suggestions-dropdown" style="display:none;"></div>
+      </div>
+      <div class="form-group"><label>رقم الملف</label><input type="text" id="editCreditFileCode"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>تاريخ الوصول</label><input type="date" id="editCreditArrivalDate"></div>
+      <div class="form-group"><label>تاريخ المغادرة</label><input type="date" id="editCreditDepartureDate"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>نوع الحركة</label><select id="editCreditType"><option value="deposit">مدين (لنا)</option><option value="deduction">دائن (المحصّل)</option></select></div>
+      <div class="form-group">
+        <label>المبلغ والعملة</label>
+        <div class="amount-input-group">
+          <input type="number" id="editCreditAmount" step="any" inputmode="decimal">
+          <select id="editCreditCurrency"><option value="EGP">EGP</option><option value="USD">USD</option><option value="EUR">EUR</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="form-group"><label>البيان</label><textarea id="editCreditDescription"></textarea></div>
+    <div class="btn-group" style="justify-content:flex-end;">
+      <button class="submit-btn" onclick="App.saveEditedCredit()">حفظ التعديلات</button>
+      <button class="print-btn" onclick="App.closeCreditEditModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal تعديل حركة محل -->
 <div id="editShopModal" class="modal-overlay">
   <div class="modal-content">
@@ -1537,12 +1572,12 @@
 </div>
 
 <!-- ================= LANGUAGE / TRANSLATION SYSTEM ================= -->
-<script src="i18n.js?v=20261026d"></script>
+<script src="i18n.js?v=20261026e"></script>
 
 <!-- ================= NAVIGATION & GLOBAL JS ================= -->
-<script src="helpers.js?v=20261026d"></script>
+<script src="helpers.js?v=20261026e"></script>
 
 <!-- ================= JAVASCRIPT LOGIC ================= -->
-<script type="module" src="app.js?v=20261026d"></script>
+<script type="module" src="app.js?v=20261026e"></script>
 </body>
 </html>

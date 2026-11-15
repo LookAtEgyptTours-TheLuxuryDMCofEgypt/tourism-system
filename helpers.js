@@ -787,6 +787,24 @@
     document.getElementById('creditEntity').value = name;
     document.getElementById('creditEntitySuggestions').style.display = 'none';
   }
+  // اقتراحات اسم الجهة في نافذة تعديل حركة الكريديت (نفس منطق صفحة الإضافة)
+  function searchEditCreditEntitySuggestions() {
+    const queryVal = document.getElementById('editCreditEntity').value.trim().toLowerCase();
+    const dropdown = document.getElementById('editCreditEntitySuggestions');
+    if (!queryVal || !window.App) { dropdown.style.display = 'none'; return; }
+    const matched = [...new Set(window.App.currentCredit.map(c => c.entity))].filter(e => e && e.toLowerCase().includes(queryVal));
+    if (matched.length === 0) { dropdown.style.display = 'none'; return; }
+    dropdown.innerHTML = matched.map(m => `<div class="suggestion-item" data-name="${escapeHTML(m)}" onclick="selectEditCreditEntitySuggestion(this.dataset.name)"><span>${escapeHTML(m)}</span></div>`).join('');
+    dropdown.style.display = 'block';
+  }
+  function selectEditCreditEntitySuggestion(name) {
+    document.getElementById('editCreditEntity').value = name;
+    document.getElementById('editCreditEntitySuggestions').style.display = 'none';
+  }
+  document.addEventListener('click', (e) => {
+    const dd = document.getElementById('editCreditEntitySuggestions');
+    if (dd && dd.style.display !== 'none' && !e.target.closest('#editCreditEntity') && !e.target.closest('#editCreditEntitySuggestions')) dd.style.display = 'none';
+  });
   function searchShopEntitySuggestions() {
     const queryVal = document.getElementById('shopEntity').value.trim().toLowerCase();
     const dropdown = document.getElementById('shopEntitySuggestions');

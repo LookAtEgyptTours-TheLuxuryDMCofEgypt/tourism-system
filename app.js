@@ -503,6 +503,7 @@
               <td>${escapeHTML(data.description || '-')}</td>
               <td>${dateStr}</td>
               <td class="no-print">
+                <button class="edit-btn" onclick="App.openCreditEditModal('${docSnap.id}')">${t('btn_edit')}</button>
                 <button class="delete-btn" onclick="App.deleteCredit('${docSnap.id}')">حذف</button>
               </td>
             </tr>
@@ -535,6 +536,45 @@
         $('creditEntity').value = ''; $('creditFileCode').value = ''; $('creditAmount').value = ''; $('creditDescription').value = '';
       } catch (e) { showToast(e.message, 'error'); } 
       finally { btn.disabled = false; }
+    },
+
+    openCreditEditModal(id) {
+      const item = this.currentCredit.find(c => c.id === id);
+      if (!item) return;
+      $('editCreditId').value = id;
+      $('editCreditEntity').value = item.entity || '';
+      $('editCreditFileCode').value = item.fileCode || '';
+      $('editCreditArrivalDate').value = item.arrivalDate || '';
+      $('editCreditDepartureDate').value = item.departureDate || '';
+      $('editCreditType').value = item.type === 'deduction' ? 'deduction' : 'deposit';
+      $('editCreditAmount').value = (item.amount != null) ? item.amount : '';
+      const cur = item.currency || 'EGP', curSel = $('editCreditCurrency');
+      if (!Array.from(curSel.options).some(o => o.value === cur)) { const o = document.createElement('option'); o.value = cur; o.textContent = cur; curSel.appendChild(o); }
+      curSel.value = cur;
+      $('editCreditDescription').value = item.description || '';
+      $('editCreditEntitySuggestions').style.display = 'none';
+      $('editCreditModal').style.display = 'flex';
+    },
+
+    closeCreditEditModal() { $('editCreditModal').style.display = 'none'; },
+
+    async saveEditedCredit() {
+      const id = $('editCreditId').value;
+      const entity = $('editCreditEntity').value.trim();
+      const fileCode = $('editCreditFileCode').value.trim();
+      const arrivalDate = $('editCreditArrivalDate').value;
+      const departureDate = $('editCreditDepartureDate').value;
+      const type = $('editCreditType').value;
+      const amount = parseFloat($('editCreditAmount').value);
+      const currency = $('editCreditCurrency').value;
+      const description = $('editCreditDescription').value.trim();
+
+      if (!entity || isNaN(amount) || amount <= 0) return showToast('يرجى كتابة الجهة والمبلغ بشكل صحيح', 'error');
+      try {
+        await updateDoc(doc(db, "credit_balances", id), { entity, fileCode, arrivalDate, departureDate, type, amount, currency, description });
+        showToast('تم حفظ التعديلات بنجاح', 'success');
+        this.closeCreditEditModal();
+      } catch (e) { showToast(e.message, 'error'); }
     },
 
     async deleteCredit(id) {
