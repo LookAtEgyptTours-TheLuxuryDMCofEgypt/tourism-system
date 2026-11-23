@@ -1024,6 +1024,28 @@
     syncShopFeeMode(true);
   }
 
+  // ترتيب حركات كشف الحساب بتاريخ تسجيل العملية (الأقدم تسجيلًا الأول)، ولو نفس لحظة التسجيل (زي الاستيراد من إكسيل)
+  // بنرتّب بتاريخ الوصول ثم المغادرة. تواريخ الوصول والمغادرة بتظهر في الكشف للمعلومية بس.
+  function statementDateInfo(r) {
+    const ms = (v) => { const t = v ? Date.parse(v) : NaN; return isNaN(t) ? null : t; };
+    let created = 0;
+    if (r.createdAt) {
+      if (typeof r.createdAt.seconds === 'number') created = r.createdAt.seconds * 1000 + Math.floor((r.createdAt.nanoseconds || 0) / 1e6);
+      else created = Date.parse(r.createdAt) || (r.createdAt instanceof Date ? r.createdAt.getTime() : 0);
+    }
+    const arrival = ms(r.arrivalDate), departure = ms(r.departureDate);
+    return { created, arrival, departure, tie1: arrival !== null ? arrival : (departure !== null ? departure : 0), tie2: departure !== null ? departure : 0 };
+  }
+
+  function statementDateCell(r, info) {
+    const main = info.created ? new Date(info.created).toLocaleDateString('en-GB') : '-';
+    let stay = '';
+    if (r.arrivalDate && r.departureDate) stay = `${formatDateDMY(r.arrivalDate)} ← ${formatDateDMY(r.departureDate)}`;
+    else if (r.arrivalDate) stay = `وصول ${formatDateDMY(r.arrivalDate)}`;
+    else if (r.departureDate) stay = `مغادرة ${formatDateDMY(r.departureDate)}`;
+    return `${main}${stay ? `<small style="display:block; color:#64748b; white-space:nowrap;" title="تواريخ الوصول والمغادرة المسجلة على الحركة">${stay}</small>` : ''}`;
+  }
+
   function renderRunningStatement() {
     const entity = document.getElementById('stEntityName').value.trim();
     const currency = document.getElementById('stCurrency').value;
@@ -1044,7 +1066,9 @@
       if ((c.currency || 'EGP').toUpperCase() !== currency) return false;
       if (fileCode && !(c.fileCode || '').toLowerCase().includes(fileCode)) return false;
       return true;
-    }).sort((a,b) => new Date(a.arrivalDate || 0) - new Date(b.arrivalDate || 0));
+    }).map(r => ({ r, d: statementDateInfo(r) }))
+      .sort((x, y) => (x.d.created - y.d.created) || (x.d.tie1 - y.d.tie1) || (x.d.tie2 - y.d.tie2))
+      .map(x => x.r);
 
     let runningBalance = 0;
     let totalDebit = 0;
@@ -1063,7 +1087,7 @@
 
       html += `
         <tr>
-          <td>${formatDateDMY(r.arrivalDate)}</td>
+          <td>${statementDateCell(r, statementDateInfo(r))}</td>
           <td>${escapeHTML(r.description || r.fileCode || '-')}</td>
           <td style="color:#16a34a; font-weight:700;">${debitVal ? debitVal.toLocaleString() : '-'}</td>
           <td style="color:#dc2626; font-weight:700;">${creditVal ? creditVal.toLocaleString() : '-'}</td>
